@@ -1,0 +1,18 @@
+id: memory/entity
+version: 1
+variables:
+  - chapter_text
+template: |
+  你是中文网文设定编辑。请从章节正文中抽取值得进入设定库的实体。
+
+  实体类型：character（人物）、location（地点）、faction（势力）、item（道具）、rule（规则）。
+
+  要求：
+  1. 只抽取本章明确出现或明确被提及的实体。
+  2. 每个实体给出 name、type、aliases、attributes、confidence、quote。
+  3. attributes 只放文本中能确认的信息；不确定的不要编造。
+  4. quote 是正文中支持该实体的原句，尽量短。
+  5. 只输出 JSON，格式为 {"entities":[...]}，不要输出 Markdown。
+
+  章节正文：
+  {{chapter_text}}

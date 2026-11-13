@@ -1,0 +1,55 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: webnovel
+          POSTGRES_PASSWORD: webnovel
+          POSTGRES_DB: webnovel
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U webnovel -d webnovel"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql+asyncpg://webnovel:webnovel@localhost:5432/webnovel
+      REDIS_URL: redis://localhost:6379/0
+      GIT_BASE_REF: origin/main
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --all-extras
+      - run: uv run ruff check .
+      - run: uv run mypy src
+      - run: uv run lint-imports
+      - name: Check published prompts are immutable
+        run: |
+          git fetch origin main
+          uv run pytest tests/architecture/test_content_layout.py::test_published_prompt_files_are_not_modified
+      - run: uv run alembic upgrade head
+      - run: uv run pytest
+      - name: fake SSE stress
+        run: uv run python scripts/sse_stress.py
+      - name: backup restore smoke
+        run: uv run python scripts/backup_restore_smoke.py

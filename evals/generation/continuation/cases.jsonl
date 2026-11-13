@@ -1,0 +1,1 @@
+{"id":"gen-cont-001","input":{"task":"continue","chapter_outline":"主角在雨夜进入旧巷，听见第二声钟响","recent_text":"长夜灯火在雨里晃了一下。"},"expected_facts":["主角进入旧巷","听见钟响"],"constraints":["不自动推进大剧情","保持短句文风"],"rubric":"续写是否承接原文语气，并覆盖两个事实","tags":["smoke"],"must_pass":true}

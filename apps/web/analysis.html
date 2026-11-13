@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Analysis</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Reverse Outline</h1>
+    <nav><a href="/app/">World Draft</a><a href="/app/library.html">Library</a></nav>
+    <span id="status"></span>
+  </header>
+  <main class="single">
+    <section class="panel">
+      <h2>分析已有作品</h2>
+      <input id="work" placeholder="work_id">
+      <button id="start">开始反向大纲</button>
+      <pre id="report"></pre>
+    </section>
+    <section class="panel">
+      <h2>Outline 草稿</h2>
+      <button id="outline">加载 Outline</button>
+      <textarea id="content" rows="18"></textarea>
+      <button id="save">保存草稿</button>
+      <pre id="message"></pre>
+    </section>
+  </main>
+  <script src="analysis.js"></script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Library</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Author Library</h1>
+    <nav><a href="/app/">World Draft</a><a href="/app/analysis.html">Analysis</a></nav>
+    <span id="status"></span>
+  </header>
+  <main class="single">
+    <section class="panel">
+      <h2>Collection</h2>
+      <input id="name" placeholder="资料集名称" value="民国资料">
+      <input id="work" placeholder="work_id（可选）">
+      <button id="create">创建集合</button>
+      <pre id="collection"></pre>
+    </section>
+    <section class="panel">
+      <h2>上传</h2>
+      <input id="collection-id" placeholder="collection_id">
+      <input id="file" type="file">
+      <button id="upload">上传</button>
+      <pre id="upload-result"></pre>
+    </section>
+    <section class="panel">
+      <h2>检索</h2>
+      <input id="query" placeholder="检索问题" value="旧巷的灯">
+      <button id="search">搜索</button>
+      <pre id="search-result"></pre>
+    </section>
+  </main>
+  <script src="library.js"></script>
+</body>
+</html>

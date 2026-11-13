@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>World Draft</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>World Draft</h1>
+    <nav><a href="/app/analysis.html">Analysis</a><a href="/app/library.html">Library</a></nav>
+    <span id="status">后端未连接</span>
+  </header>
+  <main>
+    <section class="panel">
+      <h2>会话</h2>
+      <form id="conversation-form">
+        <select id="scope"><option value="ideation">ideation</option><option value="work">work</option></select>
+        <select id="mode"><option value="world">world</option><option value="direction">direction</option><option value="cast">cast</option><option value="story_qa">story_qa</option></select>
+        <input id="title" placeholder="会话标题" value="长夜灯火">
+        <button>新建</button>
+      </form>
+      <ul id="conversations"></ul>
+    </section>
+
+    <section class="panel">
+      <h2>对话 <small id="conversation-label">未选择</small></h2>
+      <div id="messages"></div>
+      <form id="message-form">
+        <textarea id="message" placeholder="输入消息..." rows="3"></textarea>
+        <button>发送</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>世界草案</h2>
+      <textarea id="nodes" rows="8">[
+  {"id": "char-1", "type": "character", "name": "沈砚", "attributes": {"身份": "捕快"}},
+  {"id": "loc-1", "type": "location", "name": "旧巷"}
+]</textarea>
+      <textarea id="edges" rows="4">[
+  {"from": "char-1", "to": "loc-1", "type": "appears_in"}
+]</textarea>
+      <button id="create-draft">创建/新增版本</button>
+      <pre id="draft"></pre>
+    </section>
+
+    <section class="panel">
+      <h2>Project Brief</h2>
+      <input id="premise" placeholder="一句话 premise" value="捕快在雨夜追查失踪案">
+      <input id="genre" placeholder="题材" value="悬疑">
+      <input id="titles" placeholder="书名候选，逗号分隔" value="长夜灯火,雨夜旧巷">
+      <button id="create-brief">创建 Brief</button>
+      <button id="create-work">用这个方向开书</button>
+      <pre id="brief"></pre>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

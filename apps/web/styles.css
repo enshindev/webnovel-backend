@@ -1,0 +1,23 @@
+:root { color-scheme: dark; font-family: system-ui, sans-serif; background:#11151c; color:#e6edf3; }
+body { margin:0; }
+header { display:flex; align-items:center; gap:16px; padding:16px 24px; border-bottom:1px solid #2a3440; }
+header h1 { font-size:18px; margin:0; }
+#status { color:#8b98a5; font-size:12px; }
+main.single { display:block; max-width:980px; margin:0 auto; }
+main { display:grid; grid-template-columns: 280px 1fr 1fr; gap:16px; padding:16px; }
+.panel { background:#171d26; border:1px solid #2a3440; border-radius:10px; padding:14px; }
+.panel h2 { font-size:14px; margin:0 0 10px; color:#9fb0c0; }
+input, textarea, select, button { box-sizing:border-box; width:100%; margin:4px 0; padding:8px; border-radius:6px; border:1px solid #2f3b49; background:#0f141b; color:#e6edf3; }
+button { background:#2563eb; border:0; cursor:pointer; font-weight:600; }
+button:hover { background:#1d4ed8; }
+#conversations { list-style:none; padding:0; margin:8px 0 0; }
+#conversations li { padding:8px; border-bottom:1px solid #2a3440; cursor:pointer; font-size:13px; }
+#conversations li:hover { background:#1e2936; }
+#messages { min-height:200px; max-height:420px; overflow:auto; white-space:pre-wrap; font-size:13px; line-height:1.6; }
+#messages .user { color:#93c5fd; }
+#messages .assistant { color:#e5e7eb; }
+#messages .citation { color:#fbbf24; font-size:12px; }
+pre { white-space:pre-wrap; font-size:12px; color:#9fb0c0; }
+@media (max-width: 1000px) { main { grid-template-columns:1fr; } }
+
+nav a { color:#93c5fd; margin-right:12px; text-decoration:none; font-size:13px; }

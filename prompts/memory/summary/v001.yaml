@@ -1,0 +1,14 @@
+id: memory/summary
+version: 1
+variables:
+  - chapter_text
+template: |
+  你是中文网文编辑。请阅读下面的章节正文，写一段 150-200 字的中文摘要。
+
+  要求：
+  1. 只概括本章实际发生的事件、人物状态变化、关键信息。
+  2. 不评价文笔，不预测后续。
+  3. 只输出 JSON，格式为 {"summary":"摘要正文"}，不要输出 Markdown。
+
+  章节正文：
+  {{chapter_text}}

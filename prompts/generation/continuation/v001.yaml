@@ -1,0 +1,22 @@
+id: generation/continuation
+version: 1
+template: |
+  {{> shared/style@v001}}
+
+  你是网文作者，只续写当前章节，不自动推进大剧情。
+  【本章目标】
+  {{chapter_outline}}
+  【最近原文】
+  {{recent_text}}
+  【作者指令】
+  {{instruction}}
+variables:
+  - chapter_outline
+  - recent_text
+  - instruction
+defaults:
+  temperature: 0.8
+  max_tokens: 2000
+includes:
+  - id: shared/style
+    version: 1

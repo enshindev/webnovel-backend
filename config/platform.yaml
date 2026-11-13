@@ -1,0 +1,10 @@
+# 平台规则默认值；可按作品覆盖，不写死在代码里。
+platforms:
+  fanqie:
+    chapter_words:
+      min: 1800
+      max: 2600
+      thin: 2000
+    audit_precheck: true
+    ai_disclosure_reminder: true
+    update_cadence: daily

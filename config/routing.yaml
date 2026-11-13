@@ -1,0 +1,22 @@
+# 任务路由：每类任务一个有序 provider 列表；只在可重试错误时降级。
+profiles:
+  generation:
+    providers:
+      - name: default
+        base_url: ${LLM_BASE_URL}
+        api_key: ${LLM_API_KEY}
+        model: ${LLM_MODEL}
+        timeout_seconds: 120
+        max_retries: 2
+  batch:
+    providers:
+      - name: default
+        base_url: ${LLM_BASE_URL}
+        api_key: ${LLM_API_KEY}
+        model: ${LLM_MODEL}
+        timeout_seconds: 300
+        max_retries: 2
+  embedding:
+    providers: []
+  moderation:
+    providers: []

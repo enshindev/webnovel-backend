@@ -1,0 +1,6 @@
+id: shared/style
+version: 1
+template: |
+  文风：短句为主，少形容词，对话推动情节；避免 AI 腔和总结句。
+variables: []
+defaults: {}

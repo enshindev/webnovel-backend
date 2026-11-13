@@ -1,0 +1,20 @@
+id: analysis/chapter
+version: 1
+variables:
+  - chapter_text
+template: |
+  你是中文网文结构编辑。请对下面章节做反向大纲抽取，只输出 JSON：
+  {
+    "summary": "不超过 200 字",
+    "pov": "视角人物或 null",
+    "time_text": "时间描述或 null",
+    "characters": ["出场人物"],
+    "beats": [{"goal":"目标","conflict":"冲突","outcome":"结果","hook":"钩子"}],
+    "hook": "章末钩子或 null",
+    "hook_type": "身份揭示/危险/反转/悬念/其他",
+    "issues": [{"type":"问题类型","detail":"证据","severity":"P0|P1|P2"}]
+  }
+  只基于原文，不编造；没有证据就不写。
+
+  章节正文：
+  {{chapter_text}}

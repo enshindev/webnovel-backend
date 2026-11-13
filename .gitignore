@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# 本地配置与数据
+.env
+.env.*
+!.env.example
+data/
+exports/
+logs/
+config/pricing.yaml
+
+# 开发过程文档与内部资产（不公开）
+.scratch/
+docs/
+benchmarks/
+experiments/
+third_party/
+AGENTS.md
+GLOSSARY.md
+
+# 工具缓存
+.import_linter_cache/
+.tmp-run/
+
+# 编辑器
+.idea/
+.vscode/
+.DS_Store

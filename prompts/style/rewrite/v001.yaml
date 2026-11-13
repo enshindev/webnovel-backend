@@ -1,0 +1,18 @@
+id: style/rewrite
+version: 1
+variables:
+  - profile_summary
+  - do_list
+  - dont_list
+  - content
+template: |
+  你是文风声纹改写编辑。按作者声纹改写下面文本，保留事实与剧情信息。
+
+  声纹摘要：{{profile_summary}}
+  DO：{{do_list}}
+  DON'T：{{dont_list}}
+
+  只输出改写后的正文，不要解释。
+
+  原文：
+  {{content}}
