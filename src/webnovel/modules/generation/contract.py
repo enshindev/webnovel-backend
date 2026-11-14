@@ -78,6 +78,7 @@ class Draft:
     chapter_id: UUID
     content: str
     status: DraftStatus
+    candidate_index: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +88,7 @@ class GenerationCreate:
     task_type: TaskType
     instruction: str | None = None
     target_words: int | None = None
+    candidate_count: int = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,6 +105,8 @@ class GenerationService(Protocol):
     async def cancel(self, generation_id: UUID) -> Generation: ...
 
     async def get_draft(self, draft_id: UUID) -> Draft: ...
+
+    async def list_drafts(self, generation_id: UUID) -> list[Draft]: ...
 
     async def retry(self, generation_id: UUID) -> Generation: ...
 

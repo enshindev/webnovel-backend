@@ -31,6 +31,7 @@ def payload_hash(command: GenerationCreate) -> str:
         "task_type": command.task_type.value,
         "instruction": command.instruction,
         "target_words": command.target_words,
+        "candidate_count": command.candidate_count,
     }
     raw = json.dumps(payload, ensure_ascii=False, sort_keys=True)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -63,6 +64,11 @@ class GenerationsService:
             raise ValidationError(
                 "target_words must be between 100 and 20000",
                 code="generation.invalid_target_words",
+            )
+        if not 1 <= command.candidate_count <= 4:
+            raise ValidationError(
+                "candidate_count must be between 1 and 4",
+                code="generation.invalid_candidate_count",
             )
 
         chapter = await self._chapter_service.get(command.chapter_id)
@@ -119,6 +125,10 @@ class GenerationsService:
             raise NotFoundError(f"draft not found: {draft_id}", code="draft.not_found")
         return draft
 
+    async def list_drafts(self, generation_id: UUID) -> list[Draft]:
+        await self.get(generation_id)
+        return await self._repository.list_drafts(generation_id)
+
     async def retry(self, generation_id: UUID) -> Generation:
         original = await self.get(generation_id)
         if original.status not in {
@@ -130,12 +140,14 @@ class GenerationsService:
                 f"generation is not retryable: {original.status}",
                 code="generation.not_retryable",
             )
+        previous = await self._repository.list_drafts(original.id)
         command = GenerationCreate(
             work_id=original.work_id,
             chapter_id=original.chapter_id,
             task_type=original.task_type,
             instruction=original.instruction,
             target_words=original.target_words,
+            candidate_count=max(1, min(4, len(previous))),
         )
         return await self.create(command, f"retry:{generation_id.hex[:16]}:{uuid4().hex[:16]}")
 

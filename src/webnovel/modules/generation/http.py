@@ -22,6 +22,7 @@ class GenerationCreateBody(BaseModel):
     task_type: TaskType
     instruction: str | None = Field(default=None, max_length=4000)
     target_words: int | None = Field(default=None, ge=100, le=20_000)
+    candidate_count: int = Field(default=1, ge=1, le=4)
 
 
 class GenerationOut(BaseModel):
@@ -47,6 +48,11 @@ class DraftOut(BaseModel):
     chapter_id: UUID
     content: str
     status: str
+    candidate_index: int = 0
+
+
+class DraftList(BaseModel):
+    items: list[DraftOut]
 
 
 class AcceptDraftBody(BaseModel):
@@ -90,6 +96,7 @@ async def create_generation(
             task_type=body.task_type,
             instruction=body.instruction,
             target_words=body.target_words,
+            candidate_count=body.candidate_count,
         ),
         idempotency_key=idempotency_key,
     )
@@ -127,6 +134,12 @@ async def retry_generation(generation_id: UUID, service: GenerationServiceDep) -
 @router.post("/generations/{generation_id}/cancel", response_model=GenerationOut)
 async def cancel_generation(generation_id: UUID, service: GenerationServiceDep) -> GenerationOut:
     return GenerationOut.model_validate(await service.cancel(generation_id))
+
+
+@router.get("/generations/{generation_id}/drafts", response_model=DraftList)
+async def list_drafts(generation_id: UUID, service: GenerationServiceDep) -> DraftList:
+    drafts = await service.list_drafts(generation_id)
+    return DraftList(items=[DraftOut.model_validate(draft) for draft in drafts])
 
 
 @router.get("/drafts/{draft_id}", response_model=DraftOut)

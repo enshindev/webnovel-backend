@@ -76,6 +76,9 @@ class FakeGenerationRepository:
     async def get_draft(self, draft_id: UUID) -> Draft | None:
         return self.draft
 
+    async def list_drafts(self, generation_id: UUID) -> list[Draft]:
+        return [self.draft]
+
     async def accept_draft(
         self, draft_id: UUID, chapter_version_id: UUID, edit_distance: float
     ) -> Draft | None:
@@ -285,3 +288,34 @@ async def test_cancel_records_audit_and_outbox() -> None:
     outbox.emit.assert_awaited_once_with(
         "generation", repo.generation.id, "generation.cancelled", {}
     )
+
+
+async def test_create_rejects_invalid_candidate_count() -> None:
+    chapter = _chapter(uuid4())
+    repo = FakeGenerationRepository(chapter, _draft(chapter))
+    service = GenerationsService(repo, FakeChapterService(chapter, _version(chapter)))
+    try:
+        await service.create(
+            GenerationCreate(
+                work_id=chapter.work_id,
+                chapter_id=chapter.id,
+                task_type=TaskType.CONTINUE,
+                candidate_count=5,
+            ),
+            "idem-3",
+        )
+    except ValidationError as exc:
+        assert exc.code == "generation.invalid_candidate_count"
+    else:
+        raise AssertionError("expected ValidationError")
+
+
+async def test_candidate_count_changes_payload_hash() -> None:
+    single = GenerationCreate(work_id=uuid4(), chapter_id=uuid4(), task_type=TaskType.CONTINUE)
+    triple = GenerationCreate(
+        work_id=single.work_id,
+        chapter_id=single.chapter_id,
+        task_type=TaskType.CONTINUE,
+        candidate_count=3,
+    )
+    assert payload_hash(single) != payload_hash(triple)

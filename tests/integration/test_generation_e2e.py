@@ -87,3 +87,99 @@ async def test_generation_pipeline_with_fake_model(
     finally:
         await redis.aclose()
         await engine.dispose()
+
+
+async def test_multi_candidate_generation(
+    postgres_url: str, redis_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", postgres_url)
+    monkeypatch.setenv("REDIS_URL", redis_url)
+    monkeypatch.setenv("LLM_PROVIDER", "fake")
+    monkeypatch.setenv("LLM_MODEL", "fake")
+    from webnovel.infra.config import get_settings
+
+    get_settings.cache_clear()
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=ROOT,
+        env={**os.environ},
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    from webnovel.infra.db.engine import create_engine
+    from webnovel.infra.redis import create_redis
+    from webnovel.infra.streams import RedisStreamBuffer
+    from webnovel.llm.gateway.factory import build_model_client
+    from webnovel.modules.chapters_versions.repository import SqlAlchemyChapterRepository
+    from webnovel.modules.chapters_versions.service import ChaptersService
+    from webnovel.modules.generation.contract import (
+        DraftStatus,
+        GenerationCreate,
+        GenerationStatus,
+        TaskType,
+    )
+    from webnovel.modules.generation.repository import SqlAlchemyGenerationRepository
+    from webnovel.modules.generation.runner import GenerationRunner
+    from webnovel.modules.generation.service import GenerationsService
+    from webnovel.modules.usage.pricing import load_pricing
+    from webnovel.modules.usage.repository import SqlAlchemyUsageRepository
+    from webnovel.modules.usage.service import UsageServiceImpl
+    from webnovel.modules.works.repository import SqlAlchemyWorkRepository
+    from webnovel.modules.works.service import WorksService
+
+    settings = get_settings()
+    engine = create_engine()
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    redis = create_redis()
+    try:
+        async with session_factory() as session, session.begin():
+            works = WorksService(SqlAlchemyWorkRepository(session))
+            work = await works.create("E2E-Multi", "悬疑")
+            chapters = ChaptersService(SqlAlchemyChapterRepository(session), works)
+            chapter = await chapters.create(work.id, 1, "雨夜", "旧文。")
+            generations = GenerationsService(SqlAlchemyGenerationRepository(session), chapters)
+            generation = await generations.create(
+                GenerationCreate(
+                    work_id=work.id,
+                    chapter_id=chapter.id,
+                    task_type=TaskType.CONTINUE,
+                    candidate_count=3,
+                ),
+                "e2e-multi-key",
+            )
+            drafts = await generations.list_drafts(generation.id)
+            assert [draft.candidate_index for draft in drafts] == [0, 1, 2]
+
+            usage = UsageServiceImpl(
+                SqlAlchemyUsageRepository(session), load_pricing(settings.pricing_config_path)
+            )
+            runner = GenerationRunner(
+                repository=SqlAlchemyGenerationRepository(session),
+                chapter_service=chapters,
+                model_client=build_model_client(settings),
+                settings=settings,
+                buffer=RedisStreamBuffer(redis),
+                usage=usage,
+            )
+            await runner.run(generation.id)
+
+            refreshed = await generations.get(generation.id)
+            assert refreshed.status is GenerationStatus.SUCCEEDED
+            drafts = await generations.list_drafts(generation.id)
+            assert len(drafts) == 3
+            assert all(draft.content for draft in drafts)
+            assert {draft.status for draft in drafts} == {DraftStatus.READY}
+
+            accepted = await generations.accept_draft(drafts[1].id, base_version=1)
+            assert accepted.draft.candidate_index == 1
+            drafts = await generations.list_drafts(generation.id)
+            statuses = {draft.candidate_index: draft.status for draft in drafts}
+            assert statuses[1] is DraftStatus.ACCEPTED
+            assert statuses[0] is DraftStatus.DISCARDED
+            assert statuses[2] is DraftStatus.DISCARDED
+    finally:
+        await redis.aclose()
+        await engine.dispose()

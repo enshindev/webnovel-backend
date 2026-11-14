@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from uuid import UUID
 
 import structlog
@@ -14,13 +15,35 @@ from webnovel.llm.prompts.registry import PromptRegistry
 from webnovel.llm.prompts.renderer import render_prompt
 from webnovel.llm.usage import estimate_tokens
 from webnovel.modules.chapters_versions.contract import ChapterService
-from webnovel.modules.generation.contract import DraftStatus, Generation, GenerationStatus
+from webnovel.modules.generation.contract import (
+    Draft,
+    DraftStatus,
+    Generation,
+    GenerationStatus,
+)
 from webnovel.modules.generation.repository import GenerationRepository
 from webnovel.modules.memory.contract import MemoryRetrievalService
 from webnovel.modules.style.contract import StyleProfileReader
 from webnovel.modules.usage.contract import UsageService
 
 logger = structlog.get_logger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class _CandidateResult:
+    text: str
+    usage: ModelUsage
+    cancelled: bool
+
+
+def _merge_usage(left: ModelUsage, right: ModelUsage) -> ModelUsage:
+    return ModelUsage(
+        prompt_tokens=left.prompt_tokens + right.prompt_tokens,
+        completion_tokens=left.completion_tokens + right.completion_tokens,
+        cached_tokens=left.cached_tokens + right.cached_tokens,
+        estimated=left.estimated or right.estimated,
+    )
+
 
 SYSTEM_PROMPT = (
     "你是中文网文作者。只输出章节正文，不解释、不总结。承接上文语气与人物状态，不自动推进大剧情。"
@@ -54,19 +77,16 @@ class GenerationRunner:
         if generation is None:
             logger.info("generation.skip", generation_id=str(generation_id))
             return
-        draft_id = generation.draft_id
-        if draft_id is None:
+        drafts = await self._repository.list_drafts(generation.id)
+        if not drafts:
             await self._repository.finish(
                 generation.id, GenerationStatus.FAILED, DraftStatus.PARTIAL
             )
-            await self._record_usage(
-                generation,
-                locals().get("prompt_text", ""),
-                "".join(locals().get("generated", [])),
-                locals().get("final_usage", ModelUsage()),
-            )
             return
 
+        prompt_text = ""
+        completion_text = ""
+        final_usage = ModelUsage()
         try:
             chapter = await self._chapter_service.get(generation.chapter_id)
             recent_text = ""
@@ -125,6 +145,7 @@ class GenerationRunner:
                         "cache_prefix_hash": context.manifest.cache_prefix_hash,
                         "estimated": context.manifest.estimated,
                     },
+                    "candidates": len(drafts),
                 },
             )
             request = ModelRequest(
@@ -132,66 +153,83 @@ class GenerationRunner:
                 messages=context.messages,
                 max_tokens=self._max_tokens(generation.target_words),
             )
-            first_delta = True
-            cancelled = False
-            chunk_count = 0
-            pending: list[str] = []
-            generated: list[str] = []
-            final_usage = ModelUsage()
             prompt_text = "".join(message.content for message in context.messages)
-            last_checkpoint = time.monotonic()
-            async for event in self._model_client.stream(request):
-                if event.type == "error":
-                    raise RuntimeError(f"model error: {event.error_class}: {event.error_code_raw}")
-                if event.type != "delta" or not event.text:
-                    continue
-                if first_delta:
-                    await self._repository.mark_streaming(generation.id)
-                    first_delta = False
-                pending.append(event.text)
-                chunk_count += 1
-                if self._buffer is not None:
-                    await self._buffer.append(str(generation.id), event.text)
-                if len(pending) >= 64 or time.monotonic() - last_checkpoint >= 2.0:
-                    await self._repository.append_draft(draft_id, "".join(pending))
-                    pending.clear()
-                    last_checkpoint = time.monotonic()
-                if chunk_count % 32 == 0:
-                    current = await self._repository.get(generation.id)
-                    if current is not None and current.status in {
-                        GenerationStatus.CANCELLING,
-                        GenerationStatus.CANCELLED,
-                    }:
-                        cancelled = True
-                        break
 
-            if pending:
-                await self._repository.append_draft(draft_id, "".join(pending))
+            cancelled = False
+            for draft in drafts:
+                result = await self._stream_candidate(generation, draft, request)
+                completion_text += result.text
+                final_usage = _merge_usage(final_usage, result.usage)
+                await self._record_usage(generation, prompt_text, result.text, result.usage)
+                if result.cancelled:
+                    cancelled = True
+                    break
+
             if cancelled:
                 await self._repository.finish(
                     generation.id, GenerationStatus.CANCELLED, DraftStatus.PARTIAL
                 )
-                await self._record_usage(generation, prompt_text, "".join(generated), final_usage)
                 logger.info("generation.cancelled", generation_id=str(generation.id))
                 return
             await self._repository.finish(
                 generation.id, GenerationStatus.SUCCEEDED, DraftStatus.READY
             )
-            await self._record_usage(generation, prompt_text, "".join(generated), final_usage)
-            logger.info("generation.succeeded", generation_id=str(generation.id))
+            logger.info(
+                "generation.succeeded",
+                generation_id=str(generation.id),
+                candidates=len(drafts),
+            )
         except Exception:
             logger.exception("generation.failed", generation_id=str(generation.id))
-            if "pending" in locals() and pending:
-                await self._repository.append_draft(draft_id, "".join(pending))
             await self._repository.finish(
                 generation.id, GenerationStatus.FAILED, DraftStatus.PARTIAL
             )
-            await self._record_usage(
-                generation,
-                locals().get("prompt_text", ""),
-                "".join(locals().get("generated", [])),
-                locals().get("final_usage", ModelUsage()),
-            )
+            await self._record_usage(generation, prompt_text, completion_text, final_usage)
+
+    async def _stream_candidate(
+        self, generation: Generation, draft: Draft, request: ModelRequest
+    ) -> _CandidateResult:
+        first_delta = True
+        chunk_count = 0
+        pending: list[str] = []
+        generated: list[str] = []
+        final_usage = ModelUsage()
+        last_checkpoint = time.monotonic()
+        broadcast = draft.candidate_index == 0
+        async for event in self._model_client.stream(request):
+            if event.type == "error":
+                raise RuntimeError(f"model error: {event.error_class}: {event.error_code_raw}")
+            if event.type == "usage" and event.usage is not None:
+                final_usage = event.usage
+            if event.type != "delta" or not event.text:
+                continue
+            if first_delta:
+                await self._repository.mark_streaming(generation.id)
+                first_delta = False
+            pending.append(event.text)
+            generated.append(event.text)
+            chunk_count += 1
+            if broadcast and self._buffer is not None:
+                await self._buffer.append(str(generation.id), event.text)
+            if len(pending) >= 64 or time.monotonic() - last_checkpoint >= 2.0:
+                await self._repository.append_draft(draft.id, "".join(pending))
+                pending.clear()
+                last_checkpoint = time.monotonic()
+            if chunk_count % 32 == 0:
+                current = await self._repository.get(generation.id)
+                if current is not None and current.status in {
+                    GenerationStatus.CANCELLING,
+                    GenerationStatus.CANCELLED,
+                }:
+                    if pending:
+                        await self._repository.append_draft(draft.id, "".join(pending))
+                    return _CandidateResult(
+                        text="".join(generated), usage=final_usage, cancelled=True
+                    )
+
+        if pending:
+            await self._repository.append_draft(draft.id, "".join(pending))
+        return _CandidateResult(text="".join(generated), usage=final_usage, cancelled=False)
 
     async def _record_usage(
         self,

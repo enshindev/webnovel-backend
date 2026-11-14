@@ -39,6 +39,8 @@ class GenerationRepository(Protocol):
 
     async def get_draft(self, draft_id: UUID) -> Draft | None: ...
 
+    async def list_drafts(self, generation_id: UUID) -> list[Draft]: ...
+
     async def accept_draft(
         self, draft_id: UUID, chapter_version_id: UUID, edit_distance: float
     ) -> Draft | None: ...
@@ -91,6 +93,7 @@ def _draft_to_domain(model: DraftModel) -> Draft:
         chapter_id=model.chapter_id,
         content=model.content,
         status=DraftStatus(model.status),
+        candidate_index=model.candidate_index,
     )
 
 
@@ -162,17 +165,21 @@ class SqlAlchemyGenerationRepository:
         self._session.add(generation_model)
         await self._session.flush()
 
-        draft = DraftModel(
-            work_id=command.work_id,
-            chapter_id=command.chapter_id,
-            generation_id=generation_model.id,
-            content="",
-            status=DraftStatus.GENERATING.value,
-        )
-        self._session.add(draft)
+        drafts: list[DraftModel] = []
+        for index in range(command.candidate_count):
+            draft = DraftModel(
+                work_id=command.work_id,
+                chapter_id=command.chapter_id,
+                generation_id=generation_model.id,
+                content="",
+                status=DraftStatus.GENERATING.value,
+                candidate_index=index,
+            )
+            self._session.add(draft)
+            drafts.append(draft)
         await self._session.flush()
 
-        generation_model.draft_id = draft.id
+        generation_model.draft_id = drafts[0].id
         candidate_set = CandidateSetModel(
             generation_id=generation_model.id,
             task_type=command.task_type.value,
@@ -184,19 +191,21 @@ class SqlAlchemyGenerationRepository:
                     "prompt_version": None,
                     "features": {},
                 }
+                for draft in drafts
             ],
-            shown_order=[0],
+            shown_order=list(range(len(drafts))),
         )
         self._session.add(candidate_set)
         await self._session.flush()
 
-        self._session.add(
-            PreferenceEventModel(
-                candidate_set_id=candidate_set.id,
-                candidate_id=str(draft.id),
-                event_type="shown",
+        for draft in drafts:
+            self._session.add(
+                PreferenceEventModel(
+                    candidate_set_id=candidate_set.id,
+                    candidate_id=str(draft.id),
+                    event_type="shown",
+                )
             )
-        )
         self._session.add(
             IdempotencyKeyModel(
                 key=idempotency_key,
@@ -236,6 +245,15 @@ class SqlAlchemyGenerationRepository:
         model = await self._session.get(DraftModel, draft_id)
         return _draft_to_domain(model) if model is not None else None
 
+    async def list_drafts(self, generation_id: UUID) -> list[Draft]:
+        stmt = (
+            select(DraftModel)
+            .where(DraftModel.generation_id == generation_id)
+            .order_by(DraftModel.candidate_index)
+        )
+        models = (await self._session.scalars(stmt)).all()
+        return [_draft_to_domain(model) for model in models]
+
     async def accept_draft(
         self, draft_id: UUID, chapter_version_id: UUID, edit_distance: float
     ) -> Draft | None:
@@ -252,6 +270,17 @@ class SqlAlchemyGenerationRepository:
         generation = await self._session.get(GenerationModel, model.generation_id)
         if generation is not None:
             generation.accepted_at = datetime.now(UTC)
+            siblings = (
+                await self._session.scalars(
+                    select(DraftModel).where(
+                        DraftModel.generation_id == model.generation_id,
+                        DraftModel.id != model.id,
+                        DraftModel.status.in_([DraftStatus.READY.value, DraftStatus.PARTIAL.value]),
+                    )
+                )
+            ).all()
+            for sibling in siblings:
+                sibling.status = DraftStatus.DISCARDED.value
 
         candidate_set_stmt = select(CandidateSetModel).where(
             CandidateSetModel.generation_id == model.generation_id
@@ -349,10 +378,13 @@ class SqlAlchemyGenerationRepository:
         if generation is None:
             return
         generation.status = status.value
-        if generation.draft_id is not None:
-            draft = await self._session.get(DraftModel, generation.draft_id)
-            if draft is not None:
-                draft.status = draft_status.value
+        drafts = (
+            await self._session.scalars(
+                select(DraftModel).where(DraftModel.generation_id == generation_id)
+            )
+        ).all()
+        for draft in drafts:
+            draft.status = draft_status.value
         await self._session.flush()
 
 

@@ -20,6 +20,7 @@ AI 不能直接改正文，也不能直接改设定库。正文走草稿采纳�
 
 - 作品、卷、章和不可变章节版本。保存带 `base_version`，冲突返回 409。
 - 续写、改写、扩写、润色、大纲等生成任务。任务在 worker 里跑，SSE 推送，可取消、重试、断线重连。
+- 一次可以生成 1 到 4 个候选草稿，逐个对比后采纳；采纳一个，其余自动丢弃。
 - 草稿采纳后才写入新章节版本。每次生成会记录 prompt 和 context 快照。
 - 采纳章节后异步做摘要、实体、伏笔和时间线抽取。变更以 proposal 返回，作者逐条确认。
 - pgvector 加 BM25，用 RRF 融合，可选 rerank。生成前按预算组装上下文，并留下 manifest。
@@ -195,11 +196,14 @@ curl -s -X POST http://127.0.0.1:8000/api/v1/works/<work_id>/chapters \
   -H 'Content-Type: application/json' \
   -d '{"number":1,"title":"雨夜","content":""}'
 
-# 发起续写，需要 worker 在跑
+# 发起续写，需要 worker 在跑；candidate_count 可以取 1-4
 curl -s -X POST http://127.0.0.1:8000/api/v1/works/<work_id>/generations \
   -H 'Content-Type: application/json' \
   -H 'Idempotency-Key: demo-001' \
-  -d '{"chapter_id":"<chapter_id>","task_type":"continue"}'
+  -d '{"chapter_id":"<chapter_id>","task_type":"continue","candidate_count":3}'
+
+# 列出这次生成的候选草稿
+curl -s http://127.0.0.1:8000/api/v1/generations/<generation_id>/drafts
 ```
 
 ## 开发

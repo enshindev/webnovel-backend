@@ -35,6 +35,7 @@ class DraftModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     generation_id: Mapped[UUID] = mapped_column(ForeignKey("generations.id", ondelete="CASCADE"))
     content: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(32), default="generating")
+    candidate_index: Mapped[int] = mapped_column(default=0, server_default="0")
 
 
 class CandidateSetModel(UUIDPrimaryKeyMixin, Base):
