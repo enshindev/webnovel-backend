@@ -1,0 +1,3 @@
+{"id": "mem-sum-001", "input": {"chapter_text": "陈默在雨夜走进旧巷，第二声钟响时，他看见墙上的血字。他退了半步，把伞收了起来。"}, "expected_facts": ["陈默", "旧巷", "钟声"], "constraints": ["不超过 80 字", "只写本章发生的事"], "rubric": "摘要是否包含人物、地点和关键声音", "tags": ["smoke"], "must_pass": false}
+{"id": "mem-sum-002", "input": {"chapter_text": "沈砚把玉佩交给师姐，师姐没有接。两人在廊下站了很久，最后沈砚转身离开，玉佩留在石桌上。"}, "expected_facts": ["玉佩", "师姐"], "constraints": ["不推测人物心理", "保留物品去向"], "rubric": "摘要是否交代玉佩和师姐这条关系线", "tags": ["smoke"], "must_pass": false}
+{"id": "mem-sum-003", "input": {"chapter_text": "雨停后，顾迟在巷口等到天亮。同伴没有来，只留下一把断伞。顾迟把伞捡起来，往城外走。"}, "expected_facts": ["雨停", "断伞", "城外"], "constraints": ["不超过 80 字", "不解释同伴为什么没来"], "rubric": "摘要是否覆盖天气、遗留物和去向", "tags": ["smoke"], "must_pass": false}

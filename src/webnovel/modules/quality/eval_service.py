@@ -20,18 +20,34 @@ class EvalService:
         model: str | None = None,
         params: dict[str, Any] | None = None,
         results: list[dict[str, Any]] | None = None,
-    ) -> UUID:
+    ) -> tuple[UUID, dict[str, Any]]:
+        must_pass_ids = {str(case["id"]) for case in cases if case.get("must_pass")}
         run_id = await self._repository.create_run(
             task, prompt_name, prompt_version, model, params or {}
         )
-        actual = results or [
-            {"case_id": case["id"], "passed": True, "details": {"noop": True}} for case in cases
-        ]
-        passed = sum(1 for result in actual if result.get("passed"))
+        if results is None:
+            metrics = {
+                "total": len(cases),
+                "must_pass_total": len(must_pass_ids),
+                "mode": "inventory",
+            }
+            await self._repository.finish_run(
+                run_id, status="prepared", metrics=metrics, results=[]
+            )
+            return run_id, metrics
+
+        passed_ids = {str(result["case_id"]) for result in results if result.get("passed")}
+        passed = len(passed_ids)
+        must_pass_passed = len(must_pass_ids & passed_ids)
+        metrics = {
+            "total": len(results),
+            "passed": passed,
+            "pass_rate": round(passed / len(results), 4) if results else 0.0,
+            "must_pass_total": len(must_pass_ids),
+            "must_pass_passed": must_pass_passed,
+            "gate": "passed" if must_pass_passed == len(must_pass_ids) else "failed",
+        }
         await self._repository.finish_run(
-            run_id,
-            status="succeeded",
-            metrics={"total": len(actual), "passed": passed},
-            results=actual,
+            run_id, status="succeeded", metrics=metrics, results=results
         )
-        return run_id
+        return run_id, metrics

@@ -218,6 +218,18 @@ make test
 
 CI 在 [.github/workflows/ci.yml](.github/workflows/ci.yml)，会跑 lint、类型检查、迁移、测试、SSE 压测和备份恢复冒烟。
 
+评测已经有一批 smoke 用例，按 `evals/<module>/<task>/cases.jsonl` 组织：
+
+```bash
+# 只登记用例，不评分
+uv run webnovel eval --suite smoke
+
+# 传入输出后按 expected_facts 做确定性评分
+uv run webnovel eval --suite smoke --outputs outputs.jsonl
+```
+
+`outputs.jsonl` 每行是 `{"id": "case-id", "output": "..."}`。must-pass 用例没过时命令会返回 1。
+
 prompt 的规则是只加新版本，不改已发布的 `vNNN.yaml`。`labels.yaml` 负责指向当前版本。
 
 ## 目录

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import typer
 import uvicorn
 
@@ -27,34 +29,61 @@ def worker() -> None:
 
 
 @app.command("eval")
-def eval_suite(suite: str = "smoke") -> None:
+def eval_suite(suite: str = "smoke", outputs: Path | None = None) -> None:
     """跑本地评测集并写入 eval_runs。"""
     import asyncio
     import json
 
+    from webnovel.evalkit.cases import load_cases
+    from webnovel.evalkit.judge import judge_output
+    from webnovel.evalkit.summary import summarize
     from webnovel.infra.config import get_settings
     from webnovel.infra.db.session import session_factory
     from webnovel.modules.quality.eval_repository import SqlAlchemyEvalRepository
     from webnovel.modules.quality.eval_service import EvalService
 
-    async def run() -> None:
-        settings = get_settings()
-        cases: list[dict[str, object]] = []
-        for path in settings.evals_dir.rglob("cases.jsonl"):
-            for line in path.read_text(encoding="utf-8").splitlines():
-                if line.strip():
-                    case = json.loads(line)
-                    case["id"] = str(case.get("id", f"{path.stem}-{len(cases)}"))
-                    cases.append(case)
-        async with session_factory() as session, session.begin():
-            run_id = await EvalService(SqlAlchemyEvalRepository(session)).run(
-                task=suite,
-                cases=cases,
-                params={"source": "cli", "cases": len(cases)},
-            )
-        typer.echo(f"eval run_id={run_id} cases={len(cases)}")
+    settings = get_settings()
+    loaded = load_cases(settings.evals_dir, suite=suite)
+    cases = [{"id": case.spec.id, "must_pass": case.spec.must_pass} for case in loaded]
+    must_pass_ids = {case.spec.id for case in loaded if case.spec.must_pass}
 
-    asyncio.run(run())
+    outputs_map: dict[str, str] = {}
+    if outputs is not None:
+        for line in outputs.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                row = json.loads(line)
+                outputs_map[str(row["id"])] = str(row.get("output", ""))
+
+    async def run() -> tuple[str, dict[str, object]]:
+        async with session_factory() as session, session.begin():
+            service = EvalService(SqlAlchemyEvalRepository(session))
+            params = {"source": "cli", "suite": suite, "cases": len(cases)}
+            if outputs is None:
+                run_id, metrics = await service.run(task=suite, cases=cases, params=params)
+                return str(run_id), metrics
+            results = [
+                judge_output(case.spec, outputs_map.get(case.spec.id, "")) for case in loaded
+            ]
+            run_id, metrics = await service.run(
+                task=suite, cases=cases, params=params, results=results
+            )
+            summary = summarize(results, must_pass_ids)
+            return str(run_id), {**metrics, **summary}
+
+    run_id, metrics = asyncio.run(run())
+    if outputs is None:
+        typer.echo(
+            f"eval run_id={run_id} cases={metrics['total']} "
+            f"must_pass={metrics['must_pass_total']} (inventory only; pass --outputs to score)"
+        )
+        return
+    typer.echo(
+        f"eval run_id={run_id} total={metrics['total']} passed={metrics['passed']} "
+        f"must_pass={metrics['must_pass_passed']}/{metrics['must_pass_total']} "
+        f"gate={metrics['gate']}"
+    )
+    if metrics["gate"] == "failed":
+        raise typer.Exit(code=1)
 
 
 @app.command("prompt-sync")
