@@ -201,3 +201,48 @@ class TimelineEventModel(UUIDPrimaryKeyMixin, Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class StoryEventModel(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "story_events"
+
+    work_id: Mapped[UUID] = mapped_column(ForeignKey("works.id", ondelete="CASCADE"))
+    chapter_id: Mapped[UUID] = mapped_column(ForeignKey("chapters.id", ondelete="CASCADE"))
+    version_id: Mapped[UUID] = mapped_column(ForeignKey("chapter_versions.id", ondelete="CASCADE"))
+    chapter_number: Mapped[int] = mapped_column()
+    event_index: Mapped[int] = mapped_column()
+    summary: Mapped[str] = mapped_column(Text)
+    time_text: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    location: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    participants: Mapped[list[dict[str, object]]] = mapped_column(JSON, default=list)
+    changes: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    source_span: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="inferred")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class KnowledgeStateModel(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "knowledge_states"
+
+    work_id: Mapped[UUID] = mapped_column(ForeignKey("works.id", ondelete="CASCADE"))
+    character_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("entities.id", ondelete="SET NULL"), nullable=True
+    )
+    character_name: Mapped[str] = mapped_column(String(200))
+    fact_key: Mapped[str] = mapped_column(String(300))
+    fact_value: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    state: Mapped[str] = mapped_column(String(32))
+    learned_event_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("story_events.id", ondelete="SET NULL"), nullable=True
+    )
+    chapter_id: Mapped[UUID] = mapped_column(ForeignKey("chapters.id", ondelete="CASCADE"))
+    chapter_number: Mapped[int] = mapped_column()
+    source_span: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="inferred")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

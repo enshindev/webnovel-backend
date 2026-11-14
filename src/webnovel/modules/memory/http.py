@@ -86,6 +86,46 @@ class TimelineEventList(BaseModel):
     items: list[TimelineEventOut]
 
 
+class StoryEventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    work_id: UUID
+    chapter_id: UUID
+    chapter_number: int
+    event_index: int
+    summary: str
+    time_text: str | None
+    location: str | None
+    participants: list[dict[str, Any]]
+    changes: dict[str, Any]
+    confidence: float | None
+    status: str
+
+
+class StoryEventList(BaseModel):
+    items: list[StoryEventOut]
+
+
+class KnowledgeStateOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    work_id: UUID
+    character_id: UUID | None
+    character_name: str
+    fact_key: str
+    fact_value: dict[str, Any]
+    state: str
+    chapter_number: int
+    confidence: float | None
+    status: str
+
+
+class KnowledgeStateList(BaseModel):
+    items: list[KnowledgeStateOut]
+
+
 class ForeshadowCreate(BaseModel):
     description: str = Field(min_length=1, max_length=4_000)
     planted_chapter_id: UUID | None = None
@@ -203,6 +243,41 @@ async def create_timeline_event(
         work_id, body.description, body.event_time, body.chapter_id
     )
     return TimelineEventOut.model_validate(event)
+
+
+@router.get("/works/{work_id}/story-state/events", response_model=StoryEventList)
+async def list_story_events(
+    work_id: UUID,
+    service: MemoryServiceDep,
+    from_chapter: int | None = None,
+    to_chapter: int | None = None,
+) -> StoryEventList:
+    events = await service.list_story_events(
+        work_id, from_chapter=from_chapter, to_chapter=to_chapter
+    )
+    return StoryEventList(items=[StoryEventOut.model_validate(event) for event in events])
+
+
+@router.get("/works/{work_id}/story-state/knowledge", response_model=KnowledgeStateList)
+async def list_knowledge(
+    work_id: UUID,
+    service: MemoryServiceDep,
+    character_id: UUID | None = None,
+    at_chapter: int | None = None,
+) -> KnowledgeStateList:
+    states = await service.list_knowledge(work_id, character_id=character_id, at_chapter=at_chapter)
+    return KnowledgeStateList(items=[KnowledgeStateOut.model_validate(state) for state in states])
+
+
+@router.get("/works/{work_id}/story-state/who-knows", response_model=KnowledgeStateList)
+async def who_knows(
+    work_id: UUID,
+    service: MemoryServiceDep,
+    fact_key: str,
+    at_chapter: int | None = None,
+) -> KnowledgeStateList:
+    states = await service.who_knows(work_id, fact_key, at_chapter)
+    return KnowledgeStateList(items=[KnowledgeStateOut.model_validate(state) for state in states])
 
 
 @router.get("/works/{work_id}/foreshadows", response_model=ForeshadowList)

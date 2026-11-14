@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any, Protocol, cast
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from webnovel.kernel.errors import ConflictError
@@ -14,8 +14,10 @@ from webnovel.modules.memory.contract import (
     ExtractionRun,
     ExtractionStatus,
     Foreshadow,
+    KnowledgeState,
     ProposalStatus,
     ResolvedProposal,
+    StoryEvent,
     Summary,
     TimelineEvent,
 )
@@ -26,6 +28,8 @@ from webnovel.modules.memory.models import (
     ExtractionRunModel,
     ExtractionStepModel,
     ForeshadowModel,
+    KnowledgeStateModel,
+    StoryEventModel,
     SummaryModel,
     TimelineEventModel,
 )
@@ -112,6 +116,35 @@ class MemoryRepository(Protocol):
     async def add_timeline_event(
         self, work_id: UUID, description: str, event_time: str | None, chapter_id: UUID | None
     ) -> TimelineEvent: ...
+
+    async def replace_story_events(
+        self,
+        work_id: UUID,
+        chapter_id: UUID,
+        version_id: UUID,
+        chapter_number: int,
+        events: list[dict[str, Any]],
+    ) -> list[StoryEvent]: ...
+
+    async def list_story_events(
+        self,
+        work_id: UUID,
+        *,
+        from_chapter: int | None = None,
+        to_chapter: int | None = None,
+    ) -> list[StoryEvent]: ...
+
+    async def list_knowledge(
+        self,
+        work_id: UUID,
+        *,
+        character_id: UUID | None = None,
+        at_chapter: int | None = None,
+    ) -> list[KnowledgeState]: ...
+
+    async def who_knows(
+        self, work_id: UUID, fact_key: str, at_chapter: int | None = None
+    ) -> list[KnowledgeState]: ...
 
     async def add_foreshadow(
         self,
@@ -566,6 +599,111 @@ class SqlAlchemyMemoryRepository:
         await self._session.refresh(model)
         return _foreshadow_to_domain(model)
 
+    async def replace_story_events(
+        self,
+        work_id: UUID,
+        chapter_id: UUID,
+        version_id: UUID,
+        chapter_number: int,
+        events: list[dict[str, Any]],
+    ) -> list[StoryEvent]:
+        await self._session.execute(
+            delete(KnowledgeStateModel).where(KnowledgeStateModel.chapter_id == chapter_id)
+        )
+        await self._session.execute(
+            delete(StoryEventModel).where(StoryEventModel.chapter_id == chapter_id)
+        )
+        saved: list[StoryEvent] = []
+        for index, item in enumerate(events, 1):
+            event = StoryEventModel(
+                work_id=work_id,
+                chapter_id=chapter_id,
+                version_id=version_id,
+                chapter_number=chapter_number,
+                event_index=int(item.get("index", index)),
+                summary=str(item["summary"]),
+                time_text=cast(str | None, item.get("time_text")),
+                location=cast(str | None, item.get("location")),
+                participants=cast(list[dict[str, object]], item.get("participants", [])),
+                changes={
+                    "knowledge_changes": item.get("knowledge_changes", []),
+                    "entity_changes": item.get("entity_changes", []),
+                },
+                source_span=cast(dict[str, object], item.get("source_span", {})),
+                confidence=cast(float | None, item.get("confidence")),
+                status="inferred",
+            )
+            self._session.add(event)
+            await self._session.flush()
+            for change in cast(list[dict[str, Any]], item.get("knowledge_changes", [])):
+                raw_character_id = change.get("character_id")
+                character_id = UUID(str(raw_character_id)) if raw_character_id else None
+                self._session.add(
+                    KnowledgeStateModel(
+                        work_id=work_id,
+                        character_id=character_id,
+                        character_name=str(change["character_name"]),
+                        fact_key=str(change["fact_key"]),
+                        fact_value=cast(dict[str, object], change.get("fact_value", {})),
+                        state=str(change.get("state", "knows")),
+                        learned_event_id=event.id,
+                        chapter_id=chapter_id,
+                        chapter_number=chapter_number,
+                        source_span=cast(dict[str, object], item.get("source_span", {})),
+                        confidence=cast(float | None, item.get("confidence")),
+                        status="inferred",
+                    )
+                )
+            saved.append(_story_event_to_domain(event))
+        await self._session.flush()
+        return saved
+
+    async def list_story_events(
+        self,
+        work_id: UUID,
+        *,
+        from_chapter: int | None = None,
+        to_chapter: int | None = None,
+    ) -> list[StoryEvent]:
+        stmt = select(StoryEventModel).where(StoryEventModel.work_id == work_id)
+        if from_chapter is not None:
+            stmt = stmt.where(StoryEventModel.chapter_number >= from_chapter)
+        if to_chapter is not None:
+            stmt = stmt.where(StoryEventModel.chapter_number <= to_chapter)
+        stmt = stmt.order_by(StoryEventModel.chapter_number, StoryEventModel.event_index)
+        models = (await self._session.scalars(stmt)).all()
+        return [_story_event_to_domain(model) for model in models]
+
+    async def list_knowledge(
+        self,
+        work_id: UUID,
+        *,
+        character_id: UUID | None = None,
+        at_chapter: int | None = None,
+    ) -> list[KnowledgeState]:
+        stmt = select(KnowledgeStateModel).where(KnowledgeStateModel.work_id == work_id)
+        if character_id is not None:
+            stmt = stmt.where(KnowledgeStateModel.character_id == character_id)
+        if at_chapter is not None:
+            stmt = stmt.where(KnowledgeStateModel.chapter_number <= at_chapter)
+        stmt = stmt.order_by(KnowledgeStateModel.chapter_number, KnowledgeStateModel.fact_key)
+        models = (await self._session.scalars(stmt)).all()
+        return [_knowledge_to_domain(model) for model in models]
+
+    async def who_knows(
+        self, work_id: UUID, fact_key: str, at_chapter: int | None = None
+    ) -> list[KnowledgeState]:
+        stmt = select(KnowledgeStateModel).where(
+            KnowledgeStateModel.work_id == work_id,
+            KnowledgeStateModel.fact_key == fact_key.strip().casefold(),
+            KnowledgeStateModel.state.in_(["knows", "suspects"]),
+        )
+        if at_chapter is not None:
+            stmt = stmt.where(KnowledgeStateModel.chapter_number <= at_chapter)
+        stmt = stmt.order_by(KnowledgeStateModel.chapter_number, KnowledgeStateModel.character_name)
+        models = (await self._session.scalars(stmt)).all()
+        return [_knowledge_to_domain(model) for model in models]
+
     async def get_entity(self, entity_id: UUID) -> Entity | None:
         model = await self._session.get(EntityModel, entity_id)
         return _entity_to_domain(model) if model is not None else None
@@ -655,3 +793,35 @@ class SqlAlchemyMemoryRepository:
         await self._session.flush()
         await self._session.refresh(model)
         return _entity_to_domain(model)
+
+
+def _story_event_to_domain(model: StoryEventModel) -> StoryEvent:
+    return StoryEvent(
+        id=model.id,
+        work_id=model.work_id,
+        chapter_id=model.chapter_id,
+        chapter_number=model.chapter_number,
+        event_index=model.event_index,
+        summary=model.summary,
+        time_text=model.time_text,
+        location=model.location,
+        participants=list(model.participants),
+        changes=dict(model.changes),
+        confidence=model.confidence,
+        status=model.status,
+    )
+
+
+def _knowledge_to_domain(model: KnowledgeStateModel) -> KnowledgeState:
+    return KnowledgeState(
+        id=model.id,
+        work_id=model.work_id,
+        character_id=model.character_id,
+        character_name=model.character_name,
+        fact_key=model.fact_key,
+        fact_value=dict(model.fact_value),
+        state=model.state,
+        chapter_number=model.chapter_number,
+        confidence=model.confidence,
+        status=model.status,
+    )

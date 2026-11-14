@@ -48,6 +48,8 @@ async def test_postgres_migrations_apply(
             "workflow_runs",
             "prompt_versions",
             "prompt_labels",
+            "story_events",
+            "knowledge_states",
         } <= tables
         assert "conversations" in tables
     finally:

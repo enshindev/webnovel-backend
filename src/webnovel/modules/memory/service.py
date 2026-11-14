@@ -12,10 +12,12 @@ from webnovel.modules.memory.contract import (
     Entity,
     ExtractionRun,
     Foreshadow,
+    KnowledgeState,
     MemoryIndexer,
     MemoryService,
     ProposalStatus,
     ResolvedProposal,
+    StoryEvent,
     Summary,
     TimelineEvent,
 )
@@ -84,6 +86,33 @@ class MemoryServiceImpl(MemoryService):
 
     async def list_foreshadows(self, work_id: UUID) -> list[Foreshadow]:
         return await self._repository.list_foreshadows(work_id)
+
+    async def list_story_events(
+        self,
+        work_id: UUID,
+        *,
+        from_chapter: int | None = None,
+        to_chapter: int | None = None,
+    ) -> list[StoryEvent]:
+        return await self._repository.list_story_events(
+            work_id, from_chapter=from_chapter, to_chapter=to_chapter
+        )
+
+    async def list_knowledge(
+        self,
+        work_id: UUID,
+        *,
+        character_id: UUID | None = None,
+        at_chapter: int | None = None,
+    ) -> list[KnowledgeState]:
+        return await self._repository.list_knowledge(
+            work_id, character_id=character_id, at_chapter=at_chapter
+        )
+
+    async def who_knows(
+        self, work_id: UUID, fact_key: str, at_chapter: int | None = None
+    ) -> list[KnowledgeState]:
+        return await self._repository.who_knows(work_id, fact_key, at_chapter)
 
     async def list_timeline(self, work_id: UUID) -> list[TimelineEvent]:
         return await self._repository.list_timeline(work_id)

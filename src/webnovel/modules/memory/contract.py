@@ -77,6 +77,36 @@ class ResolvedProposal:
 
 
 @dataclass(frozen=True, slots=True)
+class StoryEvent:
+    id: UUID
+    work_id: UUID
+    chapter_id: UUID
+    chapter_number: int
+    event_index: int
+    summary: str
+    time_text: str | None
+    location: str | None
+    participants: list[dict[str, Any]]
+    changes: dict[str, Any]
+    confidence: float | None
+    status: str
+
+
+@dataclass(frozen=True, slots=True)
+class KnowledgeState:
+    id: UUID
+    work_id: UUID
+    character_id: UUID | None
+    character_name: str
+    fact_key: str
+    fact_value: dict[str, Any]
+    state: str
+    chapter_number: int
+    confidence: float | None
+    status: str
+
+
+@dataclass(frozen=True, slots=True)
 class TimelineEvent:
     id: UUID
     work_id: UUID
@@ -160,6 +190,26 @@ class MemoryService(Protocol):
     async def add_timeline_event(
         self, work_id: UUID, description: str, event_time: str | None, chapter_id: UUID | None
     ) -> TimelineEvent: ...
+
+    async def list_story_events(
+        self,
+        work_id: UUID,
+        *,
+        from_chapter: int | None = None,
+        to_chapter: int | None = None,
+    ) -> list[StoryEvent]: ...
+
+    async def list_knowledge(
+        self,
+        work_id: UUID,
+        *,
+        character_id: UUID | None = None,
+        at_chapter: int | None = None,
+    ) -> list[KnowledgeState]: ...
+
+    async def who_knows(
+        self, work_id: UUID, fact_key: str, at_chapter: int | None = None
+    ) -> list[KnowledgeState]: ...
 
     async def create_foreshadow(
         self,

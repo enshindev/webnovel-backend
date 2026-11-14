@@ -60,7 +60,7 @@ class ExtractionRunner:
             return
         await self._repository.set_run_status(run.id, ExtractionStatus.RUNNING)
         try:
-            await self._chapter_service.get(run.chapter_id)
+            chapter = await self._chapter_service.get(run.chapter_id)
             version = await self._chapter_service.get_version(run.chapter_id, run.version_id)
             text = version.content
         except WebnovelError as exc:
@@ -76,8 +76,11 @@ class ExtractionRunner:
         errors: list[str] = []
         await self._run_summary(run.id, run.work_id, run.chapter_id, run.version_id, text, errors)
         await self._run_entities(run.id, run.work_id, run.chapter_id, text, errors)
+        await self._run_events(
+            run.id, run.work_id, run.chapter_id, run.version_id, chapter.number, text, errors
+        )
 
-        if len(errors) == 2:
+        if len(errors) == 3:
             status = ExtractionStatus.FAILED
         elif errors:
             status = ExtractionStatus.PARTIAL
@@ -211,6 +214,95 @@ class ExtractionRunner:
             logger.exception("extraction.entity_failed", run_id=str(run_id))
             await self._repository.finish_step(step_id, "failed", error=str(exc))
             errors.append(f"entities: {exc}")
+
+    async def _run_events(
+        self,
+        run_id: UUID,
+        work_id: UUID,
+        chapter_id: UUID,
+        version_id: UUID,
+        chapter_number: int,
+        text: str,
+        errors: list[str],
+    ) -> None:
+        step_id = await self._repository.create_step(run_id, "event")
+        try:
+            prompt = self._prompt("memory/event")
+            includes = PromptRegistry(self._settings.prompts_dir).load_includes(prompt)
+            rendered = render_prompt(prompt, {"chapter_text": text}, includes)
+            raw_result = await self._model_client.complete(
+                self._request(rendered, max_tokens=1_800)
+            )
+            result = parse_json(raw_result)
+            raw_events = (
+                result
+                if isinstance(result, list)
+                else cast(dict[str, Any], result).get("events", [])
+            )
+            if not isinstance(raw_events, list):
+                raise ValueError("events must be a list")
+            events = [
+                await self._event_payload(work_id, cast(dict[str, Any], item))
+                for item in raw_events
+            ]
+            await self._repository.replace_story_events(
+                work_id, chapter_id, version_id, chapter_number, events
+            )
+            await self._record_usage(work_id, "event", rendered, raw_result)
+            await self._repository.finish_step(
+                step_id,
+                "succeeded",
+                model=self._settings.llm_model,
+                prompt_version=prompt.version,
+            )
+        except Exception as exc:
+            logger.exception("extraction.event_failed", run_id=str(run_id))
+            await self._repository.finish_step(step_id, "failed", error=str(exc))
+            errors.append(f"event: {exc}")
+
+    async def _event_payload(self, work_id: UUID, item: dict[str, Any]) -> dict[str, Any]:
+        summary = str(item.get("summary", "")).strip()
+        if not summary:
+            raise ValueError("event requires summary")
+        participants = item.get("participants", [])
+        changes = item.get("knowledge_changes", [])
+        entity_changes = item.get("entity_changes", [])
+        if not isinstance(participants, list) or not isinstance(changes, list):
+            raise ValueError("invalid participants/knowledge_changes")
+        if not isinstance(entity_changes, list):
+            raise ValueError("invalid entity_changes")
+
+        knowledge_changes: list[dict[str, Any]] = []
+        for change in changes:
+            change = cast(dict[str, Any], change)
+            character = str(change.get("character", "")).strip()
+            fact = str(change.get("fact", "")).strip()
+            state = str(change.get("state", "knows")).strip()
+            if not character or not fact:
+                continue
+            if state not in {"knows", "suspects", "does_not_know"}:
+                state = "knows"
+            entity = await self._repository.find_entity(work_id, "character", character, [])
+            knowledge_changes.append(
+                {
+                    "character_id": str(entity.id) if entity is not None else None,
+                    "character_name": character,
+                    "fact_key": fact.casefold(),
+                    "fact_value": {"text": fact},
+                    "state": state,
+                }
+            )
+        return {
+            "index": int(item.get("index", 0)),
+            "summary": summary,
+            "time_text": str(item.get("time_text")).strip() if item.get("time_text") else None,
+            "location": str(item.get("location")).strip() if item.get("location") else None,
+            "participants": participants,
+            "knowledge_changes": knowledge_changes,
+            "entity_changes": entity_changes,
+            "source_span": {"quote": str(item.get("quote", ""))},
+            "confidence": self._confidence(item),
+        }
 
     async def _record_usage(
         self, work_id: UUID, task_type: str, prompt_text: str, completion_text: str
