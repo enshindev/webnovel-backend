@@ -268,7 +268,11 @@ def get_assistant_service(
         if embedding_client is not None
         else None
     )
-    tools = AssistantTools(retrieval=retrieval, memory_repository=memory_repository)
+    tools = AssistantTools(
+        retrieval=retrieval,
+        memory_repository=memory_repository,
+        story_state=MemoryServiceImpl(memory_repository),
+    )
     knowledge_store = (
         KnowledgeSearchService(embedding_client, SqlAlchemyKnowledgeRepository(session))
         if embedding_client is not None

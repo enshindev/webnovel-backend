@@ -10,6 +10,7 @@ from webnovel.modules.memory.contract import (
     EntityLookup,
     MemoryChunk,
     MemoryRetrievalService,
+    MemoryService,
 )
 
 
@@ -33,9 +34,11 @@ class AssistantTools:
         *,
         retrieval: MemoryRetrievalService | None,
         memory_repository: EntityLookup,
+        story_state: MemoryService | None = None,
     ) -> None:
         self._retrieval = retrieval
         self._memory_repository = memory_repository
+        self._story_state = story_state
 
     async def search_chapters(self, work_id: UUID, query: str, limit: int = 5) -> list[MemoryChunk]:
         if self._retrieval is None:
@@ -72,6 +75,35 @@ class AssistantTools:
                     },
                 },
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "who_knows",
+                    "description": "查某个事实在某一章之前被哪些角色知道或怀疑",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "fact_key": {"type": "string"},
+                            "at_chapter": {"type": "integer", "minimum": 1},
+                        },
+                        "required": ["fact_key"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_story_events",
+                    "description": "按章节区间查故事事件",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "from_chapter": {"type": "integer", "minimum": 1},
+                            "to_chapter": {"type": "integer", "minimum": 1},
+                        },
+                    },
+                },
+            },
         ]
 
     async def execute(self, name: str, work_id: UUID, arguments: str) -> ToolExecution:
@@ -102,6 +134,58 @@ class AssistantTools:
                         "ref": f"entity:{entity.id}",
                         "quote": text[:200],
                     }
+                ],
+            )
+        if name == "who_knows":
+            if self._story_state is None:
+                return ToolExecution(text="故事状态暂不可用。")
+            fact_key = str(args.get("fact_key", "")).strip()
+            at_chapter = args.get("at_chapter")
+            states = await self._story_state.who_knows(
+                work_id,
+                fact_key,
+                at_chapter=int(at_chapter) if at_chapter is not None else None,
+            )
+            if not states:
+                return ToolExecution(text="没有找到知道该事实的角色。")
+            text = "\n".join(
+                f"{state.character_name}：{state.state}（第 {state.chapter_number} 章）"
+                for state in states
+            )
+            return ToolExecution(
+                text=text,
+                citations=[
+                    {
+                        "source": "knowledge",
+                        "ref": f"knowledge:{state.id}",
+                        "quote": f"{state.character_name} {state.state} {state.fact_key}",
+                    }
+                    for state in states
+                ],
+            )
+        if name == "get_story_events":
+            if self._story_state is None:
+                return ToolExecution(text="故事状态暂不可用。")
+            from_chapter = args.get("from_chapter")
+            to_chapter = args.get("to_chapter")
+            events = await self._story_state.list_story_events(
+                work_id,
+                from_chapter=int(from_chapter) if from_chapter is not None else None,
+                to_chapter=int(to_chapter) if to_chapter is not None else None,
+            )
+            events = events[:20]
+            if not events:
+                return ToolExecution(text="该区间没有故事事件。")
+            text = "\n".join(f"第 {event.chapter_number} 章：{event.summary}" for event in events)
+            return ToolExecution(
+                text=text,
+                citations=[
+                    {
+                        "source": "story_event",
+                        "ref": f"story_event:{event.id}",
+                        "quote": event.summary[:200],
+                    }
+                    for event in events
                 ],
             )
         return ToolExecution(text=f"未知工具：{name}")

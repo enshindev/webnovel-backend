@@ -211,9 +211,11 @@ async def run_agent(ctx: object, run_id: str) -> None:
             if embedding_client is not None
             else None
         )
+        memory_repository = SqlAlchemyMemoryRepository(session)
         tools = AssistantTools(
             retrieval=retrieval,
-            memory_repository=SqlAlchemyMemoryRepository(session),
+            memory_repository=memory_repository,
+            story_state=MemoryServiceImpl(memory_repository),
         )
         executor = AgentExecutor(
             repository=SqlAlchemyAgentRepository(session),
