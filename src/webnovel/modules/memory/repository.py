@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any, Protocol, cast
 from uuid import UUID
@@ -686,9 +687,11 @@ class SqlAlchemyMemoryRepository:
             stmt = stmt.where(KnowledgeStateModel.character_id == character_id)
         if at_chapter is not None:
             stmt = stmt.where(KnowledgeStateModel.chapter_number <= at_chapter)
-        stmt = stmt.order_by(KnowledgeStateModel.chapter_number, KnowledgeStateModel.fact_key)
+        stmt = stmt.order_by(
+            KnowledgeStateModel.chapter_number.desc(), KnowledgeStateModel.created_at.desc()
+        )
         models = (await self._session.scalars(stmt)).all()
-        return [_knowledge_to_domain(model) for model in models]
+        return _latest_knowledge(models)
 
     async def who_knows(
         self, work_id: UUID, fact_key: str, at_chapter: int | None = None
@@ -696,13 +699,16 @@ class SqlAlchemyMemoryRepository:
         stmt = select(KnowledgeStateModel).where(
             KnowledgeStateModel.work_id == work_id,
             KnowledgeStateModel.fact_key == fact_key.strip().casefold(),
-            KnowledgeStateModel.state.in_(["knows", "suspects"]),
         )
         if at_chapter is not None:
             stmt = stmt.where(KnowledgeStateModel.chapter_number <= at_chapter)
-        stmt = stmt.order_by(KnowledgeStateModel.chapter_number, KnowledgeStateModel.character_name)
+        stmt = stmt.order_by(
+            KnowledgeStateModel.chapter_number.desc(), KnowledgeStateModel.created_at.desc()
+        )
         models = (await self._session.scalars(stmt)).all()
-        return [_knowledge_to_domain(model) for model in models]
+        return [
+            state for state in _latest_knowledge(models) if state.state in {"knows", "suspects"}
+        ]
 
     async def get_entity(self, entity_id: UUID) -> Entity | None:
         model = await self._session.get(EntityModel, entity_id)
@@ -825,3 +831,15 @@ def _knowledge_to_domain(model: KnowledgeStateModel) -> KnowledgeState:
         confidence=model.confidence,
         status=model.status,
     )
+
+
+def _latest_knowledge(models: Sequence[KnowledgeStateModel]) -> list[KnowledgeState]:
+    seen: set[tuple[str, str]] = set()
+    result: list[KnowledgeState] = []
+    for model in models:
+        key = (str(model.character_id or model.character_name), model.fact_key)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(_knowledge_to_domain(model))
+    return result
