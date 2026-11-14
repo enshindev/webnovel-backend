@@ -48,3 +48,35 @@ def test_metrics_endpoint() -> None:
     response = client.get("/metrics")
     assert response.status_code == 200
     assert "webnovel_http_requests_total" in response.text
+
+
+def test_request_id_header_is_echoed() -> None:
+    from fastapi.testclient import TestClient
+
+    from webnovel.entrypoints.api.app import create_app
+
+    response = TestClient(create_app()).get("/health", headers={"X-Request-ID": "test-request"})
+    assert response.headers["x-request-id"] == "test-request"
+
+
+def test_cors_preflight_for_configured_origin(monkeypatch) -> None:
+    from fastapi.testclient import TestClient
+
+    from webnovel.entrypoints.api.app import create_app
+    from webnovel.infra.config import get_settings
+
+    monkeypatch.setenv("CORS_ORIGINS", "http://localhost:5173")
+    get_settings.cache_clear()
+    try:
+        response = TestClient(create_app()).options(
+            "/api/v1/works",
+            headers={
+                "Origin": "http://localhost:5173",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+    finally:
+        get_settings.cache_clear()
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"

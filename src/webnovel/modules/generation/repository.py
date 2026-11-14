@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from webnovel.kernel.errors import ConflictError
@@ -354,3 +354,14 @@ class SqlAlchemyGenerationRepository:
             if draft is not None:
                 draft.status = draft_status.value
         await self._session.flush()
+
+
+async def delete_expired_idempotency_keys(
+    session: AsyncSession, now: datetime | None = None
+) -> int:
+    cutoff = now or datetime.now(UTC)
+    result = await session.execute(
+        delete(IdempotencyKeyModel).where(IdempotencyKeyModel.expires_at < cutoff)
+    )
+    rowcount = getattr(result, "rowcount", 0)
+    return int(rowcount or 0)

@@ -162,6 +162,9 @@ API 和 worker 都在 compose 里，启动时会自动跑 Alembic 迁移。数�
 | `RERANK_*` | rerank 服务。留空则关闭重排 |
 | `DAILY_BUDGET` | 每日预算，单位元。到 100% 会阻断生成和审稿 |
 | `API_TOKEN` | 可选的 Bearer token |
+| `CORS_ORIGINS` | 逗号分隔的允许来源，留空不启用 |
+| `LOG_JSON` | 生产环境可设为 `true`，输出 JSON 日志 |
+| `LOG_LEVEL` | 日志级别，默认 `INFO` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP trace 地址，例如 `http://localhost:4318/v1/traces` |
 
 完整列表见 [`.env.example`](.env.example)。

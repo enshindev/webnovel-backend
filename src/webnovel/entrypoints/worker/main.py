@@ -13,6 +13,7 @@ from webnovel.entrypoints.worker.jobs import (
     run_export_cleanup,
     run_extraction,
     run_generation,
+    run_idempotency_cleanup,
     run_knowledge_index,
     run_outbox_dispatch,
     run_quality_review,
@@ -20,6 +21,7 @@ from webnovel.entrypoints.worker.jobs import (
     run_workflow_stage,
 )
 from webnovel.infra.config import get_settings
+from webnovel.infra.logging import configure_logging
 
 
 class WorkerSettings:
@@ -36,6 +38,7 @@ class WorkerSettings:
         run_workflow_all,
         run_outbox_dispatch,
         run_knowledge_index,
+        run_idempotency_cleanup,
     ]
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
     job_timeout = 600
@@ -45,12 +48,14 @@ class WorkerSettings:
         cron(run_export_cleanup, hour=3),
         cron(run_outbox_dispatch, minute=0),
         cron(run_knowledge_index, hour=2),
+        cron(run_idempotency_cleanup, minute=17),
     ]
 
 
 def main() -> None:
     from arq.worker import run_worker
 
+    configure_logging(get_settings())
     run_worker(WorkerSettings)  # type: ignore[arg-type]
 
 

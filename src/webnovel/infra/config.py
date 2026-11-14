@@ -26,7 +26,11 @@ class Settings(BaseSettings):
     assistant_enabled: bool = True
     api_token: str = ""
     rate_limit_per_minute: int = 0
+    cors_origins: str = ""
+    cors_allow_credentials: bool = False
     outbox_webhook_url: str = ""
+    log_json: bool = False
+    log_level: str = "INFO"
 
     embedding_base_url: str = ""
     embedding_api_key: str = ""

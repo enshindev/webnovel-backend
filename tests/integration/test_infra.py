@@ -62,3 +62,45 @@ async def test_redis_reachable(redis_url: str) -> None:
         assert await client.ping() is True
     finally:
         await client.aclose()
+
+
+async def test_expired_idempotency_keys_are_cleaned(postgres_url: str) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import select
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    from webnovel.modules.generation.models import IdempotencyKeyModel
+    from webnovel.modules.generation.repository import delete_expired_idempotency_keys
+
+    engine = create_async_engine(postgres_url)
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with sessions() as session, session.begin():
+            session.add(
+                IdempotencyKeyModel(
+                    key="expired-key",
+                    scope="test",
+                    payload_hash="hash",
+                    expires_at=datetime.now(UTC) - timedelta(hours=1),
+                )
+            )
+            session.add(
+                IdempotencyKeyModel(
+                    key="live-key",
+                    scope="test",
+                    payload_hash="hash",
+                    expires_at=datetime.now(UTC) + timedelta(hours=1),
+                )
+            )
+
+        async with sessions() as session, session.begin():
+            deleted = await delete_expired_idempotency_keys(session)
+            assert deleted == 1
+
+        async with sessions() as session:
+            keys = set((await session.scalars(select(IdempotencyKeyModel.key))).all())
+            assert "live-key" in keys
+            assert "expired-key" not in keys
+    finally:
+        await engine.dispose()

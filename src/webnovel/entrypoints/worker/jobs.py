@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
+import structlog
+
 from webnovel.infra.config import get_settings
 from webnovel.infra.db.session import session_factory
 from webnovel.infra.queue import ArqExtractionQueue
@@ -24,7 +26,10 @@ from webnovel.modules.chapters_versions.service import ChaptersService
 from webnovel.modules.export.cleanup import cleanup_exports
 from webnovel.modules.export.repository import SqlAlchemyExportRepository
 from webnovel.modules.export.runner import ExportRunner
-from webnovel.modules.generation.repository import SqlAlchemyGenerationRepository
+from webnovel.modules.generation.repository import (
+    SqlAlchemyGenerationRepository,
+    delete_expired_idempotency_keys,
+)
 from webnovel.modules.generation.runner import GenerationRunner
 from webnovel.modules.memory.chapter_embedding_repository import (
     SqlAlchemyChapterEmbeddingRepository,
@@ -48,6 +53,8 @@ from webnovel.modules.workflow.repository import SqlAlchemyWorkflowRepository
 from webnovel.modules.workflow.service import WorkflowServiceImpl
 from webnovel.modules.works.repository import SqlAlchemyWorkRepository
 from webnovel.modules.works.service import WorksService
+
+logger = structlog.get_logger(__name__)
 
 
 async def run_generation(ctx: object, generation_id: str) -> None:
@@ -295,3 +302,10 @@ async def run_workflow_all(ctx: object, run_id: str) -> None:
         )
         service = WorkflowServiceImpl(SqlAlchemyWorkflowRepository(session), work_service)
         await WorkflowAutoRunner(executor, service).run_all(run_id)
+
+
+async def run_idempotency_cleanup(ctx: object) -> None:
+    _ = ctx
+    async with session_factory() as session, session.begin():
+        deleted = await delete_expired_idempotency_keys(session)
+    logger.info("idempotency.cleanup", deleted=deleted)

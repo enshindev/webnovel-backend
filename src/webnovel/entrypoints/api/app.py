@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -10,6 +11,7 @@ from webnovel.entrypoints.api.middleware import (
     RequestIdMiddleware,
 )
 from webnovel.infra.config import get_settings
+from webnovel.infra.logging import configure_logging
 from webnovel.infra.observability import configure_observability, instrument_app, metrics_response
 from webnovel.kernel.errors import WebnovelError
 from webnovel.modules.agent.http import router as agent_router
@@ -34,6 +36,8 @@ API_PREFIX = "/api/v1"
 
 
 def create_app() -> FastAPI:
+    settings = get_settings()
+    configure_logging(settings)
     configure_observability()
     app = FastAPI(
         title="Webnovel Backend",
@@ -41,12 +45,20 @@ def create_app() -> FastAPI:
         description="AI 网文创作平台后端（单用户自托管）",
     )
     app.add_middleware(RequestIdMiddleware)
-    settings = get_settings()
     if settings.api_token:
         app.add_middleware(AuthMiddleware, token=settings.api_token)
     if settings.rate_limit_per_minute > 0:
         app.add_middleware(RateLimitMiddleware, limit_per_minute=settings.rate_limit_per_minute)
     instrument_app(app)
+    origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
+    if origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=origins,
+            allow_credentials=settings.cors_allow_credentials,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
     @app.exception_handler(WebnovelError)
     async def handle_webnovel_error(request: Request, exc: WebnovelError) -> JSONResponse:

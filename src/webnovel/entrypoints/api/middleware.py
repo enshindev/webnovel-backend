@@ -8,6 +8,7 @@ from uuid import uuid4
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
+from structlog.contextvars import bind_contextvars, clear_contextvars
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
@@ -16,7 +17,11 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         request_id = request.headers.get("X-Request-ID") or uuid4().hex
         request.state.request_id = request_id
-        response = await call_next(request)
+        bind_contextvars(request_id=request_id, path=request.url.path, method=request.method)
+        try:
+            response = await call_next(request)
+        finally:
+            clear_contextvars()
         response.headers["X-Request-ID"] = request_id
         return response
 
