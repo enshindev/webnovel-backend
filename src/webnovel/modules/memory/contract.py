@@ -93,6 +93,15 @@ class StoryEvent:
 
 
 @dataclass(frozen=True, slots=True)
+class Contradiction:
+    kind: str
+    severity: str
+    message: str
+    chapter_number: int
+    evidence: list[dict[str, Any]]
+
+
+@dataclass(frozen=True, slots=True)
 class KnowledgeState:
     id: UUID
     work_id: UUID
@@ -210,6 +219,8 @@ class MemoryService(Protocol):
     async def who_knows(
         self, work_id: UUID, fact_key: str, at_chapter: int | None = None
     ) -> list[KnowledgeState]: ...
+
+    async def contradictions(self, work_id: UUID) -> list[Contradiction]: ...
 
     async def create_foreshadow(
         self,

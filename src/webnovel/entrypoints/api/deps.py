@@ -325,6 +325,7 @@ def get_quality_service(
     settings: SettingsDep,
 ) -> QualityService:
     queue = ArqQualityQueue(settings.redis_url)
+    memory = MemoryServiceImpl(SqlAlchemyMemoryRepository(session))
     return QualityServiceImpl(
         SqlAlchemyQualityRepository(session),
         chapter_service,
@@ -332,6 +333,7 @@ def get_quality_service(
         queue.enqueue_review,
         audit,
         outbox,
+        memory.contradictions,
     )
 
 

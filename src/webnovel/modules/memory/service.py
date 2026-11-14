@@ -9,6 +9,7 @@ import structlog
 from webnovel.kernel.errors import NotFoundError, ValidationError
 from webnovel.modules.memory.contract import (
     ChangeProposal,
+    Contradiction,
     Entity,
     ExtractionRun,
     Foreshadow,
@@ -22,6 +23,7 @@ from webnovel.modules.memory.contract import (
     TimelineEvent,
 )
 from webnovel.modules.memory.repository import MemoryRepository
+from webnovel.modules.memory.story_state import detect_contradictions
 
 logger = structlog.get_logger(__name__)
 
@@ -113,6 +115,10 @@ class MemoryServiceImpl(MemoryService):
         self, work_id: UUID, fact_key: str, at_chapter: int | None = None
     ) -> list[KnowledgeState]:
         return await self._repository.who_knows(work_id, fact_key, at_chapter)
+
+    async def contradictions(self, work_id: UUID) -> list[Contradiction]:
+        events = await self._repository.list_story_events(work_id)
+        return detect_contradictions(events)
 
     async def list_timeline(self, work_id: UUID) -> list[TimelineEvent]:
         return await self._repository.list_timeline(work_id)

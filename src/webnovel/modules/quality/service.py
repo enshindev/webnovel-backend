@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 from webnovel.kernel.errors import NotFoundError, ValidationError
@@ -9,7 +10,7 @@ from webnovel.modules.audit.contract import AuditRecorder
 from webnovel.modules.chapters_versions.contract import ChapterService
 from webnovel.modules.outbox.contract import OutboxService
 from webnovel.modules.quality.checker import check_chapter as run_machine_check
-from webnovel.modules.quality.contract import QualityReport, QualityService
+from webnovel.modules.quality.contract import QualityIssue, QualityReport, QualityService
 from webnovel.modules.quality.repository import QualityRepository
 from webnovel.modules.quality.rules import PlatformRules
 
@@ -23,6 +24,7 @@ class QualityServiceImpl(QualityService):
         enqueue: Callable[[UUID], Awaitable[None]] | None = None,
         audit: AuditRecorder | None = None,
         outbox: OutboxService | None = None,
+        contradictions: Callable[[UUID], Awaitable[list[Any]]] | None = None,
     ) -> None:
         self._repository = repository
         self._chapter_service = chapter_service
@@ -30,6 +32,7 @@ class QualityServiceImpl(QualityService):
         self._enqueue = enqueue
         self._audit = audit
         self._outbox = outbox
+        self._contradictions = contradictions
 
     async def check_chapter(self, work_id: UUID, chapter_id: UUID) -> QualityReport:
         chapter = await self._chapter_service.get(chapter_id)
@@ -44,16 +47,40 @@ class QualityServiceImpl(QualityService):
             chapter_numbers=[item.number for item in chapters],
             rules=self._rules,
         )
+        issues = list(result.issues)
+        contradictions = 0
+        if self._contradictions is not None:
+            try:
+                for item in await self._contradictions(work_id):
+                    if item.chapter_number != chapter.number:
+                        continue
+                    contradictions += 1
+                    issues.append(
+                        QualityIssue(
+                            code=item.kind,
+                            severity=item.severity,
+                            message=item.message,
+                            location={"chapter": chapter.number},
+                        )
+                    )
+            except Exception:
+                pass
+        status = result.status
+        if any(issue.severity == "P0" for issue in issues):
+            status = "failed"
+        elif any(issue.severity == "P1" for issue in issues) and status == "passed":
+            status = "warning"
+        score = max(0, result.score - contradictions * 8)
         return await self._repository.save(
             QualityReport(
                 id=uuid4(),
                 work_id=work_id,
                 chapter_id=chapter.id,
                 version_id=version.id,
-                status=result.status,
-                score=result.score,
-                issues=result.issues,
-                metrics=result.metrics,
+                status=status,
+                score=score,
+                issues=issues,
+                metrics={**result.metrics, "contradictions": contradictions},
                 created_at=datetime.now(UTC),
             )
         )

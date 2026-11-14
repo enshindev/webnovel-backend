@@ -126,6 +126,20 @@ class KnowledgeStateList(BaseModel):
     items: list[KnowledgeStateOut]
 
 
+class ContradictionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    kind: str
+    severity: str
+    message: str
+    chapter_number: int
+    evidence: list[dict[str, Any]]
+
+
+class ContradictionList(BaseModel):
+    items: list[ContradictionOut]
+
+
 class ForeshadowCreate(BaseModel):
     description: str = Field(min_length=1, max_length=4_000)
     planted_chapter_id: UUID | None = None
@@ -256,6 +270,14 @@ async def list_story_events(
         work_id, from_chapter=from_chapter, to_chapter=to_chapter
     )
     return StoryEventList(items=[StoryEventOut.model_validate(event) for event in events])
+
+
+@router.get("/works/{work_id}/story-state/contradictions", response_model=ContradictionList)
+async def list_contradictions(work_id: UUID, service: MemoryServiceDep) -> ContradictionList:
+    contradictions = await service.contradictions(work_id)
+    return ContradictionList(
+        items=[ContradictionOut.model_validate(item) for item in contradictions]
+    )
 
 
 @router.get("/works/{work_id}/story-state/knowledge", response_model=KnowledgeStateList)

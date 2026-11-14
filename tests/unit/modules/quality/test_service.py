@@ -79,3 +79,32 @@ async def test_check_chapter_saves_passing_report() -> None:
     report = await service.check_chapter(chapter.work_id, chapter.id)
     assert report.status == "passed"
     assert report.score == 100
+
+
+async def test_check_chapter_includes_story_contradictions() -> None:
+    chapter, version = _chapter_and_version()
+
+    async def contradictions(work_id: UUID) -> list[object]:
+        return [
+            type(
+                "Contradiction",
+                (),
+                {
+                    "kind": "knowledge.conflict",
+                    "severity": "P1",
+                    "message": "角色同时知道和不知道同一件事",
+                    "chapter_number": chapter.number,
+                },
+            )()
+        ]
+
+    service = QualityServiceImpl(
+        FakeQualityRepository(),
+        FakeChapterService(chapter, version),
+        PlatformRules(),
+        contradictions=contradictions,
+    )
+    report = await service.check_chapter(chapter.work_id, chapter.id)
+    assert report.status == "warning"
+    assert report.metrics["contradictions"] == 1
+    assert any(issue.code == "knowledge.conflict" for issue in report.issues)

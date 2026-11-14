@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 from webnovel.modules.memory.contract import KnowledgeState, StoryEvent
 from webnovel.modules.memory.extraction import ExtractionRunner
 from webnovel.modules.memory.service import MemoryServiceImpl
+from webnovel.modules.memory.story_state import detect_contradictions
 
 
 class FakeRepository:
@@ -83,3 +84,64 @@ async def test_service_delegates_story_queries() -> None:
     assert await service.list_story_events(work_id) == []
     assert await service.list_knowledge(work_id) == []
     assert await service.who_knows(work_id, "钟声来自地下") == []
+
+
+def _event(chapter: int, changes: dict[str, object]) -> StoryEvent:
+    return StoryEvent(
+        id=uuid4(),
+        work_id=uuid4(),
+        chapter_id=uuid4(),
+        chapter_number=chapter,
+        event_index=1,
+        summary="事件",
+        time_text=None,
+        location=None,
+        participants=[],
+        changes=changes,
+        confidence=0.8,
+        status="inferred",
+    )
+
+
+def test_detects_knowledge_conflict_in_same_chapter() -> None:
+    event = _event(
+        3,
+        {
+            "knowledge_changes": [
+                {"character_name": "沈砚", "fact_key": "钟声来自地下", "state": "knows"},
+                {"character_name": "沈砚", "fact_key": "钟声来自地下", "state": "does_not_know"},
+            ]
+        },
+    )
+    result = detect_contradictions([event])
+    assert len(result) == 1
+    assert result[0].kind == "knowledge.conflict"
+    assert result[0].severity == "P1"
+
+
+def test_detects_entity_state_conflict_in_same_chapter() -> None:
+    event = _event(
+        3,
+        {
+            "entity_changes": [
+                {"entity": "玉佩", "field": "holder", "after": "沈砚"},
+                {"entity": "玉佩", "field": "holder", "after": "师姐"},
+            ]
+        },
+    )
+    result = detect_contradictions([event])
+    assert len(result) == 1
+    assert result[0].kind == "entity.state_conflict"
+    assert result[0].severity == "P2"
+
+
+def test_no_contradiction_for_normal_events() -> None:
+    event = _event(
+        3,
+        {
+            "knowledge_changes": [
+                {"character_name": "沈砚", "fact_key": "钟声来自地下", "state": "knows"}
+            ]
+        },
+    )
+    assert detect_contradictions([event]) == []
