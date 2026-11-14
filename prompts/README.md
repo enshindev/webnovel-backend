@@ -61,3 +61,14 @@ labels:
 - prompt 的发布节奏、label、灰度、回滚与代码不同，放在 `src/` 会和 wheel 发布绑在一起。
 - 版本化与评审可以独立进行；代码只引用 label，不引用文件路径。
 - 每次生成记录实际解析到的 `version + content_hash`。
+
+
+## 晋升
+
+label 的变更走 CLI，不手改数据库：
+
+```bash
+uv run webnovel prompt-promote generation/continuation 2 --note "开头更稳"
+```
+
+命令会先检查该版本最近一次 eval run 是否 gate=`passed`，再改 `labels.yaml`、同步 `prompt_labels` 并写审计。`--force` 可跳过检查，`--dry-run` 只打印变更。

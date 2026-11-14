@@ -232,6 +232,17 @@ uv run webnovel eval --suite smoke --outputs outputs.jsonl
 
 prompt 的规则是只加新版本，不改已发布的 `vNNN.yaml`。`labels.yaml` 负责指向当前版本。
 
+跑过评测后可以晋升 label：
+
+```bash
+uv run webnovel eval --suite smoke --outputs outputs.jsonl \
+  --prompt-id generation/continuation --prompt-version 2
+
+uv run webnovel prompt-promote generation/continuation 2 --note "开头更稳"
+```
+
+`prompt-promote` 默认要求该 prompt/version 最近一次 eval run 的 gate 是 `passed`，否则拒绝。`--force` 跳过校验，`--dry-run` 只看变更。晋升会改 `labels.yaml`、同步数据库并写审计。
+
 ## 目录
 
 ```text
