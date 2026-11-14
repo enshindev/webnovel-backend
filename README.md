@@ -137,6 +137,15 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces
 
 Jaeger 在 <http://localhost:16686>，Prometheus 在 <http://localhost:9090>，Grafana 在 <http://localhost:3000>。
 
+### Docker
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+API 和 worker 都在 compose 里，启动时会自动跑 Alembic 迁移。数据放在 `appdata` volume，配置从 `./config` 只读挂载。
+
 ## 配置
 
 常用变量：
@@ -230,7 +239,7 @@ prompt 的规则是只加新版本，不改已发布的 `vNNN.yaml`。`labels.ya
 
 已经能用的：生成主流程、章节版本、记忆抽取、检索、质检、导出、文风声纹、反向大纲、工作流、用量账本、审计、outbox。
 
-还没做：多模态（ASR、TTS、封面）、本地模型、GraphRAG、正式前端、生产镜像。
+还没做：多模态（ASR、TTS、封面）、本地模型、GraphRAG、正式前端。生产镜像已经放在 `Dockerfile` 和 `compose.yaml`，但没有做 TLS、托管备份这些运维配套。
 
 接口还没稳定。设计文档（架构、ADR、DDL）没有随仓库公开，实际接口以 `/docs` 为准。
 

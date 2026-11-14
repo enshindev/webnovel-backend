@@ -53,3 +53,11 @@ jobs:
         run: uv run python scripts/sse_stress.py
       - name: backup restore smoke
         run: uv run python scripts/backup_restore_smoke.py
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t webnovel-backend:ci .
