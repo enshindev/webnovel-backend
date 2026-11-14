@@ -95,14 +95,6 @@ class GenerationsService:
             raise NotFoundError(
                 f"generation not found: {generation_id}", code="generation.not_found"
             )
-        if self._audit is not None:
-            await self._audit.record(
-                "generation.cancel",
-                target_type="generation",
-                target_id=str(generation.id),
-            )
-        if self._outbox is not None:
-            await self._outbox.emit("generation", generation.id, "generation.cancelled", {})
         return generation
 
     async def cancel(self, generation_id: UUID) -> Generation:
@@ -111,6 +103,14 @@ class GenerationsService:
             raise NotFoundError(
                 f"generation not found: {generation_id}", code="generation.not_found"
             )
+        if self._audit is not None:
+            await self._audit.record(
+                "generation.cancel",
+                target_type="generation",
+                target_id=str(generation.id),
+            )
+        if self._outbox is not None:
+            await self._outbox.emit("generation", generation.id, "generation.cancelled", {})
         return generation
 
     async def get_draft(self, draft_id: UUID) -> Draft:

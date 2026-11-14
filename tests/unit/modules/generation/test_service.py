@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
+from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 from webnovel.kernel.errors import ValidationError
@@ -43,6 +44,7 @@ class FakeGenerationRepository:
         self.draft = draft
         self.created: GenerationCreate | None = None
         self.accepted: tuple[UUID, UUID, float] | None = None
+        self.generation: Generation | None = None
 
     async def add(
         self, command: GenerationCreate, idempotency_key: str, payload: str
@@ -66,10 +68,10 @@ class FakeGenerationRepository:
         )
 
     async def get(self, generation_id: UUID) -> Generation | None:
-        return None
+        return self.generation
 
     async def cancel(self, generation_id: UUID) -> Generation | None:
-        return None
+        return self.generation
 
     async def get_draft(self, draft_id: UUID) -> Draft | None:
         return self.draft
@@ -225,3 +227,61 @@ async def test_discard_draft_marks_discarded() -> None:
 def test_payload_hash_is_stable() -> None:
     command = GenerationCreate(work_id=uuid4(), chapter_id=uuid4(), task_type=TaskType.CONTINUE)
     assert payload_hash(command) == payload_hash(command)
+
+
+def _generation(chapter: Chapter, draft: Draft) -> Generation:
+    return Generation(
+        id=uuid4(),
+        work_id=chapter.work_id,
+        chapter_id=chapter.id,
+        task_type=TaskType.CONTINUE,
+        status=GenerationStatus.QUEUED,
+        draft_id=draft.id,
+        prompt_name=None,
+        prompt_version=None,
+        instruction=None,
+        target_words=None,
+        created_at=datetime.now(UTC),
+    )
+
+
+async def test_get_does_not_audit_or_emit_cancel() -> None:
+    chapter = _chapter(uuid4())
+    draft = _draft(chapter)
+    repo = FakeGenerationRepository(chapter, draft)
+    repo.generation = _generation(chapter, draft)
+    audit = AsyncMock()
+    outbox = AsyncMock()
+    service = GenerationsService(
+        repo, FakeChapterService(chapter, _version(chapter)), audit=audit, outbox=outbox
+    )
+
+    generation = await service.get(repo.generation.id)
+
+    assert generation.id == repo.generation.id
+    audit.record.assert_not_awaited()
+    outbox.emit.assert_not_awaited()
+
+
+async def test_cancel_records_audit_and_outbox() -> None:
+    chapter = _chapter(uuid4())
+    draft = _draft(chapter)
+    repo = FakeGenerationRepository(chapter, draft)
+    repo.generation = _generation(chapter, draft)
+    audit = AsyncMock()
+    outbox = AsyncMock()
+    service = GenerationsService(
+        repo, FakeChapterService(chapter, _version(chapter)), audit=audit, outbox=outbox
+    )
+
+    generation = await service.cancel(repo.generation.id)
+
+    assert generation.id == repo.generation.id
+    audit.record.assert_awaited_once_with(
+        "generation.cancel",
+        target_type="generation",
+        target_id=str(repo.generation.id),
+    )
+    outbox.emit.assert_awaited_once_with(
+        "generation", repo.generation.id, "generation.cancelled", {}
+    )
