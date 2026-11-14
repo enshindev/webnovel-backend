@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     evals_dir: Path = Path("evals")
     knowledge_dir: Path = Path("knowledge")
     platform_config_path: Path = Path("config/platform.yaml")
+    routing_config_path: Path = Path("config/routing.yaml")
     export_dir: Path = Path("data/exports")
     library_dir: Path = Path("data/library")
     pricing_config_path: Path = Path("config/pricing.yaml")
@@ -56,6 +57,7 @@ class Settings(BaseSettings):
             "evals_dir",
             "knowledge_dir",
             "platform_config_path",
+            "routing_config_path",
             "export_dir",
             "library_dir",
             "pricing_config_path",

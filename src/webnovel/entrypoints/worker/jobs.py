@@ -118,7 +118,7 @@ async def run_extraction(ctx: object, run_id: str) -> None:
         runner = ExtractionRunner(
             repository=SqlAlchemyMemoryRepository(session),
             chapter_service=chapter_service,
-            model_client=build_model_client(settings),
+            model_client=build_model_client(settings, profile="batch"),
             settings=settings,
             indexer=indexer,
             usage=usage,
@@ -139,7 +139,7 @@ async def run_quality_review(ctx: object, report_id: str) -> None:
         runner = QualityReviewRunner(
             repository=SqlAlchemyQualityRepository(session),
             chapter_service=chapter_service,
-            model_client=build_model_client(settings),
+            model_client=build_model_client(settings, profile="batch"),
             settings=settings,
             usage=usage,
         )
@@ -249,7 +249,7 @@ async def run_analysis(ctx: object, run_id: str) -> None:
         runner = AnalysisRunner(
             repository=SqlAlchemyAnalysisRepository(session),
             chapter_service=chapter_service,
-            model_client=build_model_client(settings)
+            model_client=build_model_client(settings, profile="batch")
             if settings.llm_model and settings.llm_base_url
             else None,
             settings=settings,

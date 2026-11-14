@@ -1,4 +1,5 @@
 # 任务路由：每类任务一个有序 provider 列表；只在可重试错误时降级。
+# 可以追加 provider；字段支持 ${ENV} 占位符。
 profiles:
   generation:
     providers:

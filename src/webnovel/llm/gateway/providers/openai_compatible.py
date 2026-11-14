@@ -80,19 +80,24 @@ class OpenAICompatibleClient:
         status = "error"
         with ai_span("chat.completions", model=request.model, operation="chat"):
             try:
-                async with self._client() as client:
-                    response = await client.post(
-                        "/chat/completions", json=_payload(request, stream=False)
-                    )
-                    if response.status_code >= 400:
-                        raise GatewayError(
-                            ErrorClass.UPSTREAM_UNAVAILABLE
-                            if response.status_code >= 500
-                            else ErrorClass.INVALID_REQUEST,
-                            response.text,
-                            code_raw=str(response.status_code),
+                try:
+                    async with self._client() as client:
+                        response = await client.post(
+                            "/chat/completions", json=_payload(request, stream=False)
                         )
-                    data = response.json()
+                        if response.status_code >= 400:
+                            raise GatewayError(
+                                ErrorClass.UPSTREAM_UNAVAILABLE
+                                if response.status_code >= 500
+                                else ErrorClass.INVALID_REQUEST,
+                                response.text,
+                                code_raw=str(response.status_code),
+                            )
+                        data = response.json()
+                except httpx.TimeoutException as exc:
+                    raise GatewayError(ErrorClass.TIMEOUT, str(exc)) from exc
+                except httpx.HTTPError as exc:
+                    raise GatewayError(ErrorClass.UPSTREAM_UNAVAILABLE, str(exc)) from exc
                 status = "success"
             finally:
                 observe_model_call("chat", request.model, status, time.monotonic() - started)
@@ -126,47 +131,54 @@ class OpenAICompatibleClient:
             observe_model_call("chat", request.model, status, time.monotonic() - started)
 
     async def _stream(self, request: ModelRequest) -> AsyncIterator[ModelEvent]:
-        async with (
-            self._client() as client,
-            client.stream(
-                "POST", "/chat/completions", json=_payload(request, stream=True)
-            ) as response,
-        ):
-            if response.status_code >= 400:
-                body = await response.aread()
-                raise GatewayError(
-                    ErrorClass.UPSTREAM_UNAVAILABLE
-                    if response.status_code >= 500
-                    else ErrorClass.INVALID_REQUEST,
-                    body.decode("utf-8", errors="replace"),
-                    code_raw=str(response.status_code),
-                )
-            final_usage = ModelUsage()
-            tool_calls: dict[int, dict[str, str]] = {}
-            async for line in response.aiter_lines():
-                if not line.startswith("data:"):
-                    continue
-                raw = line.removeprefix("data:").strip()
-                if raw == "[DONE]":
-                    break
-                chunk = json.loads(raw)
-                if chunk.get("usage"):
-                    final_usage = _usage(chunk)
-                    yield ModelEvent(type="usage", usage=final_usage)
-                delta = (chunk.get("choices") or [{}])[0].get("delta") or {}
-                for call in delta.get("tool_calls") or []:
-                    index = int(call.get("index", 0))
-                    current = tool_calls.setdefault(index, {"id": "", "name": "", "arguments": ""})
-                    if call.get("id"):
-                        current["id"] = str(call["id"])
-                    function = call.get("function") or {}
-                    if function.get("name"):
-                        current["name"] = str(function["name"])
-                    if function.get("arguments"):
-                        current["arguments"] += str(function["arguments"])
-                text = delta.get("content")
-                if text:
-                    yield ModelEvent(type="delta", text=text)
+        try:
+            async with (
+                self._client() as client,
+                client.stream(
+                    "POST", "/chat/completions", json=_payload(request, stream=True)
+                ) as response,
+            ):
+                if response.status_code >= 400:
+                    body = await response.aread()
+                    raise GatewayError(
+                        ErrorClass.UPSTREAM_UNAVAILABLE
+                        if response.status_code >= 500
+                        else ErrorClass.INVALID_REQUEST,
+                        body.decode("utf-8", errors="replace"),
+                        code_raw=str(response.status_code),
+                    )
+                final_usage = ModelUsage()
+                tool_calls: dict[int, dict[str, str]] = {}
+                async for line in response.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    raw = line.removeprefix("data:").strip()
+                    if raw == "[DONE]":
+                        break
+                    chunk = json.loads(raw)
+                    if chunk.get("usage"):
+                        final_usage = _usage(chunk)
+                        yield ModelEvent(type="usage", usage=final_usage)
+                    delta = (chunk.get("choices") or [{}])[0].get("delta") or {}
+                    for call in delta.get("tool_calls") or []:
+                        index = int(call.get("index", 0))
+                        current = tool_calls.setdefault(
+                            index, {"id": "", "name": "", "arguments": ""}
+                        )
+                        if call.get("id"):
+                            current["id"] = str(call["id"])
+                        function = call.get("function") or {}
+                        if function.get("name"):
+                            current["name"] = str(function["name"])
+                        if function.get("arguments"):
+                            current["arguments"] += str(function["arguments"])
+                    text = delta.get("content")
+                    if text:
+                        yield ModelEvent(type="delta", text=text)
+        except httpx.TimeoutException as exc:
+            raise GatewayError(ErrorClass.TIMEOUT, str(exc)) from exc
+        except httpx.HTTPError as exc:
+            raise GatewayError(ErrorClass.UPSTREAM_UNAVAILABLE, str(exc)) from exc
         if tool_calls:
             yield ModelEvent(
                 type="tool_calls",
