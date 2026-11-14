@@ -8,6 +8,7 @@ from uuid import UUID
 
 from webnovel.infra.config import Settings
 from webnovel.kernel.ports.llm import ChatMessage, ModelClient, ModelRequest
+from webnovel.llm.guardrails.injection import guard_note, isolate_untrusted
 from webnovel.llm.prompts.registry import PromptRegistry
 from webnovel.llm.prompts.renderer import render_prompt
 from webnovel.llm.usage import estimate_tokens
@@ -294,7 +295,8 @@ class AssistantChatRunner:
             parts.append("当前是开书前的 ideation 会话，不要假定已有正文。")
         if chunks:
             memory = "\n".join(
-                f"[{chunk.source}:{chunk.ref}] {chunk.text[:800]}" for chunk in chunks
+                isolate_untrusted("memory", f"{chunk.source}:{chunk.ref}", chunk.text[:800])
+                for chunk in chunks
             )
             parts.append(f"记忆检索：\n{memory}")
         if entities:
@@ -305,13 +307,16 @@ class AssistantChatRunner:
             parts.append(f"设定实体：\n{entity_lines}")
         if knowledge_chunks:
             knowledge = "\n".join(
-                f"[knowledge:{chunk.ref}] {chunk.text[:800]}" for chunk in knowledge_chunks
+                isolate_untrusted("knowledge", str(chunk.ref), chunk.text[:800])
+                for chunk in knowledge_chunks
             )
             parts.append(f"创作知识：\n{knowledge}")
         messages = await self._repository.list_messages(conversation_id, limit=12)
         if messages:
             history = "\n".join(f"{message.role}: {message.content}" for message in messages)
             parts.append(f"最近对话：\n{history}")
+        if chunks or knowledge_chunks:
+            parts.insert(0, guard_note())
         return "\n\n".join(parts)
 
 

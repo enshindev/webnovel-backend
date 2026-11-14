@@ -8,6 +8,7 @@ from typing import Any
 from webnovel.kernel.ports.llm import ChatMessage
 from webnovel.llm.context.budget import allocate, usable_tokens
 from webnovel.llm.context.ports import ContextSegment
+from webnovel.llm.guardrails.injection import guard_note, isolate_untrusted, scan_injection
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,16 +54,22 @@ class ContextBuilder:
                 keep = max(0, int(len(text) * budget / tokens))
                 text = text[:keep]
                 tokens = budget
-            rendered.append(f"[{segment.name}:{segment.ref}]\n{text}")
+            scan = scan_injection(text)
+            rendered.append(isolate_untrusted(segment.name, segment.ref, text))
             manifest_segments.append(
                 {
                     "name": segment.name,
                     "ref": segment.ref,
                     "tokens": tokens,
                     "budget": budget,
+                    "injection_score": scan.score,
+                    "injection_blocked": scan.blocked,
                 }
             )
-        content = "\n\n".join([*rendered, user_prompt])
+        parts = [guard_note()] if rendered else []
+        parts.extend(rendered)
+        parts.append(user_prompt)
+        content = "\n\n".join(parts)
         return BuiltContext(
             messages=[
                 ChatMessage(role="system", content=system_prompt),
