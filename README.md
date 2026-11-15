@@ -233,6 +233,14 @@ uv run webnovel eval --suite smoke --outputs outputs.jsonl
 
 `outputs.jsonl` 每行是 `{"id": "case-id", "output": "..."}`。must-pass 用例没过时命令会返回 1。
 
+也可以直接让模型跑评测，会按 `batch` profile 调模型并产生 token 成本：
+
+```bash
+uv run webnovel eval --run --suite smoke \
+  --prompt-id generation/continuation --prompt-version 1 \
+  --limit 3 --save-outputs outputs.jsonl
+```
+
 prompt 的规则是只加新版本，不改已发布的 `vNNN.yaml`。`labels.yaml` 负责指向当前版本。
 
 跑过评测后可以晋升 label：

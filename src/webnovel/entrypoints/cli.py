@@ -35,6 +35,9 @@ def eval_suite(
     outputs: Path | None = None,
     prompt_id: str | None = None,
     prompt_version: int | None = None,
+    run_model: bool = typer.Option(False, "--run/--no-run", help="直接调用模型生成输出"),
+    limit: int | None = None,
+    save_outputs: Path | None = None,
 ) -> None:
     """跑本地评测集并写入 eval_runs。"""
     import asyncio
@@ -51,9 +54,28 @@ def eval_suite(
     if (prompt_id is None) != (prompt_version is None):
         typer.echo("--prompt-id and --prompt-version must be used together", err=True)
         raise typer.Exit(code=2)
+    if run_model and outputs is not None:
+        typer.echo("--run and --outputs cannot be used together", err=True)
+        raise typer.Exit(code=2)
+    if run_model and (prompt_id is None or prompt_version is None):
+        typer.echo("--run requires --prompt-id and --prompt-version", err=True)
+        raise typer.Exit(code=2)
+    if save_outputs is not None and not run_model:
+        typer.echo("--save-outputs is only valid with --run", err=True)
+        raise typer.Exit(code=2)
+    if limit is not None and limit < 1:
+        typer.echo("--limit must be positive", err=True)
+        raise typer.Exit(code=2)
 
     settings = get_settings()
     loaded = load_cases(settings.evals_dir, suite=suite)
+    if prompt_id is not None:
+        loaded = [case for case in loaded if f"{case.module}/{case.task}" == prompt_id]
+        if not loaded:
+            typer.echo(f"no eval cases found for prompt {prompt_id}", err=True)
+            raise typer.Exit(code=1)
+    if limit is not None:
+        loaded = loaded[:limit]
     cases = [{"id": case.spec.id, "must_pass": case.spec.must_pass} for case in loaded]
     must_pass_ids = {case.spec.id for case in loaded if case.spec.must_pass}
 
@@ -64,7 +86,7 @@ def eval_suite(
                 row = json.loads(line)
                 outputs_map[str(row["id"])] = str(row.get("output", ""))
 
-    async def run() -> tuple[str, dict[str, object]]:
+    async def record(results: list[dict[str, object]] | None) -> tuple[str, dict[str, object]]:
         async with session_factory() as session, session.begin():
             service = EvalService(SqlAlchemyEvalRepository(session))
             params = {
@@ -73,19 +95,9 @@ def eval_suite(
                 "cases": len(cases),
                 "prompt_id": prompt_id,
                 "prompt_version": prompt_version,
+                "run_model": run_model,
+                "limit": limit,
             }
-            if outputs is None:
-                run_id, metrics = await service.run(
-                    task=suite,
-                    cases=cases,
-                    prompt_name=prompt_id,
-                    prompt_version=prompt_version,
-                    params=params,
-                )
-                return str(run_id), metrics
-            results = [
-                judge_output(case.spec, outputs_map.get(case.spec.id, "")) for case in loaded
-            ]
             run_id, metrics = await service.run(
                 task=suite,
                 cases=cases,
@@ -94,22 +106,73 @@ def eval_suite(
                 params=params,
                 results=results,
             )
-            summary = summarize(results, must_pass_ids)
-            return str(run_id), {**metrics, **summary}
+            return str(run_id), metrics
 
-    run_id, metrics = asyncio.run(run())
+    if run_model:
+        from webnovel.evalkit.model_eval import ModelEvalResult, run_cases
+        from webnovel.llm.gateway.factory import build_model_client
+        from webnovel.llm.prompts.registry import PromptRegistry
+
+        registry = PromptRegistry(settings.prompts_dir)
+        try:
+            prompt = registry.load_version(prompt_id or "", prompt_version or 0)
+            includes = registry.load_includes(prompt)
+        except (FileNotFoundError, ValueError) as exc:
+            typer.echo(f"prompt load failed: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
+
+        async def generate() -> list[ModelEvalResult]:
+            client = build_model_client(settings, profile="batch")
+            return await run_cases(
+                loaded,
+                client=client,
+                model=settings.llm_model,
+                prompt=prompt,
+                includes=includes,
+                limit=limit,
+                progress=lambda index, total, case_id: typer.echo(
+                    f"[{index}/{total}] {case_id}", err=True
+                ),
+            )
+
+        generated = asyncio.run(generate())
+        if save_outputs is not None:
+            lines = [
+                json.dumps({"id": item.case_id, "output": item.output}, ensure_ascii=False)
+                for item in generated
+            ]
+            save_outputs.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        results = [item.result for item in generated]
+        summary = summarize(results, must_pass_ids)
+        run_id, metrics = asyncio.run(record([*results]))
+        merged = {**metrics, **summary}
+        typer.echo(
+            f"eval run_id={run_id} total={merged['total']} passed={merged['passed']} "
+            f"must_pass={merged['must_pass_passed']}/{merged['must_pass_total']} "
+            f"gate={merged['gate']}"
+        )
+        if merged["gate"] == "failed":
+            raise typer.Exit(code=1)
+        return
+
     if outputs is None:
+        run_id, metrics = asyncio.run(record(None))
         typer.echo(
             f"eval run_id={run_id} cases={metrics['total']} "
-            f"must_pass={metrics['must_pass_total']} (inventory only; pass --outputs to score)"
+            f"must_pass={metrics['must_pass_total']} (inventory only; pass --outputs or --run)"
         )
         return
+
+    results = [judge_output(case.spec, outputs_map.get(case.spec.id, "")) for case in loaded]
+    summary = summarize(results, must_pass_ids)
+    run_id, metrics = asyncio.run(record(results))
+    merged = {**metrics, **summary}
     typer.echo(
-        f"eval run_id={run_id} total={metrics['total']} passed={metrics['passed']} "
-        f"must_pass={metrics['must_pass_passed']}/{metrics['must_pass_total']} "
-        f"gate={metrics['gate']}"
+        f"eval run_id={run_id} total={merged['total']} passed={merged['passed']} "
+        f"must_pass={merged['must_pass_passed']}/{merged['must_pass_total']} "
+        f"gate={merged['gate']}"
     )
-    if metrics["gate"] == "failed":
+    if merged["gate"] == "failed":
         raise typer.Exit(code=1)
 
 
