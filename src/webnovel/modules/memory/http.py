@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from pydantic import BaseModel, ConfigDict, Field
 
 from webnovel.entrypoints.api.deps import MemoryServiceDep
@@ -280,9 +280,15 @@ async def list_story_events(
     service: MemoryServiceDep,
     from_chapter: int | None = None,
     to_chapter: int | None = None,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
 ) -> StoryEventList:
     events = await service.list_story_events(
-        work_id, from_chapter=from_chapter, to_chapter=to_chapter
+        work_id,
+        from_chapter=from_chapter,
+        to_chapter=to_chapter,
+        limit=limit,
+        offset=offset,
     )
     return StoryEventList(items=[StoryEventOut.model_validate(event) for event in events])
 
@@ -292,8 +298,10 @@ async def list_relations(
     work_id: UUID,
     service: MemoryServiceDep,
     entity_id: UUID | None = None,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
 ) -> EntityRelationList:
-    relations = await service.list_relations(work_id, entity_id)
+    relations = await service.list_relations(work_id, entity_id, limit=limit, offset=offset)
     return EntityRelationList(
         items=[EntityRelationOut.model_validate(relation) for relation in relations]
     )
@@ -324,8 +332,10 @@ async def who_knows(
     service: MemoryServiceDep,
     fact_key: str,
     at_chapter: int | None = None,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
 ) -> KnowledgeStateList:
-    states = await service.who_knows(work_id, fact_key, at_chapter)
+    states = await service.who_knows(work_id, fact_key, at_chapter, limit=limit, offset=offset)
     return KnowledgeStateList(items=[KnowledgeStateOut.model_validate(state) for state in states])
 
 

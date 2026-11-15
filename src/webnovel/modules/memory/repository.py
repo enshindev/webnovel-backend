@@ -135,6 +135,8 @@ class MemoryRepository(Protocol):
         *,
         from_chapter: int | None = None,
         to_chapter: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[StoryEvent]: ...
 
     async def list_knowledge(
@@ -143,14 +145,21 @@ class MemoryRepository(Protocol):
         *,
         character_id: UUID | None = None,
         at_chapter: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[KnowledgeState]: ...
 
     async def who_knows(
-        self, work_id: UUID, fact_key: str, at_chapter: int | None = None
+        self,
+        work_id: UUID,
+        fact_key: str,
+        at_chapter: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[KnowledgeState]: ...
 
     async def list_relations(
-        self, work_id: UUID, entity_id: UUID | None = None
+        self, work_id: UUID, entity_id: UUID | None = None, limit: int = 100, offset: int = 0
     ) -> list[EntityRelation]: ...
 
     async def add_foreshadow(
@@ -671,13 +680,19 @@ class SqlAlchemyMemoryRepository:
         *,
         from_chapter: int | None = None,
         to_chapter: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[StoryEvent]:
         stmt = select(StoryEventModel).where(StoryEventModel.work_id == work_id)
         if from_chapter is not None:
             stmt = stmt.where(StoryEventModel.chapter_number >= from_chapter)
         if to_chapter is not None:
             stmt = stmt.where(StoryEventModel.chapter_number <= to_chapter)
-        stmt = stmt.order_by(StoryEventModel.chapter_number, StoryEventModel.event_index)
+        stmt = (
+            stmt.order_by(StoryEventModel.chapter_number, StoryEventModel.event_index)
+            .limit(limit)
+            .offset(offset)
+        )
         models = (await self._session.scalars(stmt)).all()
         return [_story_event_to_domain(model) for model in models]
 
@@ -687,20 +702,32 @@ class SqlAlchemyMemoryRepository:
         *,
         character_id: UUID | None = None,
         at_chapter: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[KnowledgeState]:
         stmt = select(KnowledgeStateModel).where(KnowledgeStateModel.work_id == work_id)
         if character_id is not None:
             stmt = stmt.where(KnowledgeStateModel.character_id == character_id)
         if at_chapter is not None:
             stmt = stmt.where(KnowledgeStateModel.chapter_number <= at_chapter)
-        stmt = stmt.order_by(
-            KnowledgeStateModel.chapter_number.desc(), KnowledgeStateModel.created_at.desc()
+        stmt = (
+            stmt.order_by(
+                KnowledgeStateModel.chapter_number.desc(),
+                KnowledgeStateModel.created_at.desc(),
+            )
+            .limit(limit)
+            .offset(offset)
         )
         models = (await self._session.scalars(stmt)).all()
         return _latest_knowledge(models)
 
     async def who_knows(
-        self, work_id: UUID, fact_key: str, at_chapter: int | None = None
+        self,
+        work_id: UUID,
+        fact_key: str,
+        at_chapter: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[KnowledgeState]:
         stmt = select(KnowledgeStateModel).where(
             KnowledgeStateModel.work_id == work_id,
@@ -708,8 +735,13 @@ class SqlAlchemyMemoryRepository:
         )
         if at_chapter is not None:
             stmt = stmt.where(KnowledgeStateModel.chapter_number <= at_chapter)
-        stmt = stmt.order_by(
-            KnowledgeStateModel.chapter_number.desc(), KnowledgeStateModel.created_at.desc()
+        stmt = (
+            stmt.order_by(
+                KnowledgeStateModel.chapter_number.desc(),
+                KnowledgeStateModel.created_at.desc(),
+            )
+            .limit(limit)
+            .offset(offset)
         )
         models = (await self._session.scalars(stmt)).all()
         return [
@@ -717,7 +749,7 @@ class SqlAlchemyMemoryRepository:
         ]
 
     async def list_relations(
-        self, work_id: UUID, entity_id: UUID | None = None
+        self, work_id: UUID, entity_id: UUID | None = None, limit: int = 100, offset: int = 0
     ) -> list[EntityRelation]:
         stmt = select(EntityRelationModel).where(EntityRelationModel.work_id == work_id)
         if entity_id is not None:
@@ -727,7 +759,11 @@ class SqlAlchemyMemoryRepository:
                     EntityRelationModel.to_entity_id == entity_id,
                 )
             )
-        stmt = stmt.order_by(EntityRelationModel.created_at, EntityRelationModel.id)
+        stmt = (
+            stmt.order_by(EntityRelationModel.created_at, EntityRelationModel.id)
+            .limit(limit)
+            .offset(offset)
+        )
         models = (await self._session.scalars(stmt)).all()
         return [_relation_to_domain(model) for model in models]
 

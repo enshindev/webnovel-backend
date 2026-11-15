@@ -216,6 +216,8 @@ class MemoryService(Protocol):
         *,
         from_chapter: int | None = None,
         to_chapter: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[StoryEvent]: ...
 
     async def list_knowledge(
@@ -224,16 +226,23 @@ class MemoryService(Protocol):
         *,
         character_id: UUID | None = None,
         at_chapter: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[KnowledgeState]: ...
 
     async def who_knows(
-        self, work_id: UUID, fact_key: str, at_chapter: int | None = None
+        self,
+        work_id: UUID,
+        fact_key: str,
+        at_chapter: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[KnowledgeState]: ...
 
     async def contradictions(self, work_id: UUID) -> list[Contradiction]: ...
 
     async def list_relations(
-        self, work_id: UUID, entity_id: UUID | None = None
+        self, work_id: UUID, entity_id: UUID | None = None, limit: int = 100, offset: int = 0
     ) -> list[EntityRelation]: ...
 
     async def create_foreshadow(

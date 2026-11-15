@@ -20,17 +20,34 @@ class FakeRepository:
         return None
 
     async def list_story_events(
-        self, work_id: UUID, *, from_chapter: int | None = None, to_chapter: int | None = None
+        self,
+        work_id: UUID,
+        *,
+        from_chapter: int | None = None,
+        to_chapter: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[StoryEvent]:
         return self.events
 
     async def list_knowledge(
-        self, work_id: UUID, *, character_id: UUID | None = None, at_chapter: int | None = None
+        self,
+        work_id: UUID,
+        *,
+        character_id: UUID | None = None,
+        at_chapter: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[KnowledgeState]:
         return self.states
 
     async def who_knows(
-        self, work_id: UUID, fact_key: str, at_chapter: int | None = None
+        self,
+        work_id: UUID,
+        fact_key: str,
+        at_chapter: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[KnowledgeState]:
         return self.states
 

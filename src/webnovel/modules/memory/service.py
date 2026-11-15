@@ -96,9 +96,15 @@ class MemoryServiceImpl(MemoryService):
         *,
         from_chapter: int | None = None,
         to_chapter: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[StoryEvent]:
         return await self._repository.list_story_events(
-            work_id, from_chapter=from_chapter, to_chapter=to_chapter
+            work_id,
+            from_chapter=from_chapter,
+            to_chapter=to_chapter,
+            limit=limit,
+            offset=offset,
         )
 
     async def list_knowledge(
@@ -107,24 +113,37 @@ class MemoryServiceImpl(MemoryService):
         *,
         character_id: UUID | None = None,
         at_chapter: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[KnowledgeState]:
         return await self._repository.list_knowledge(
-            work_id, character_id=character_id, at_chapter=at_chapter
+            work_id,
+            character_id=character_id,
+            at_chapter=at_chapter,
+            limit=limit,
+            offset=offset,
         )
 
     async def who_knows(
-        self, work_id: UUID, fact_key: str, at_chapter: int | None = None
+        self,
+        work_id: UUID,
+        fact_key: str,
+        at_chapter: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[KnowledgeState]:
-        return await self._repository.who_knows(work_id, fact_key, at_chapter)
+        return await self._repository.who_knows(
+            work_id, fact_key, at_chapter, limit=limit, offset=offset
+        )
 
     async def contradictions(self, work_id: UUID) -> list[Contradiction]:
         events = await self._repository.list_story_events(work_id)
         return detect_contradictions(events)
 
     async def list_relations(
-        self, work_id: UUID, entity_id: UUID | None = None
+        self, work_id: UUID, entity_id: UUID | None = None, limit: int = 100, offset: int = 0
     ) -> list[EntityRelation]:
-        return await self._repository.list_relations(work_id, entity_id)
+        return await self._repository.list_relations(work_id, entity_id, limit=limit, offset=offset)
 
     async def list_timeline(self, work_id: UUID) -> list[TimelineEvent]:
         return await self._repository.list_timeline(work_id)
