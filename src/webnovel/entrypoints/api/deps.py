@@ -65,6 +65,8 @@ from webnovel.modules.memory.materializer import EntityMaterializerImpl
 from webnovel.modules.memory.repository import SqlAlchemyMemoryRepository
 from webnovel.modules.memory.retrieval import MemoryVectorService
 from webnovel.modules.memory.service import MemoryServiceImpl
+from webnovel.modules.multimodal.factory import build_multimodal_service
+from webnovel.modules.multimodal.service import MultimodalService
 from webnovel.modules.outbox.contract import OutboxService
 from webnovel.modules.outbox.repository import SqlAlchemyOutboxRepository
 from webnovel.modules.outbox.service import OutboxServiceImpl
@@ -240,6 +242,10 @@ def get_memory_service(session: SessionDep, settings: SettingsDep) -> MemoryServ
         else None
     )
     return MemoryServiceImpl(SqlAlchemyMemoryRepository(session), queue.enqueue_extraction, indexer)
+
+
+def get_multimodal_service(settings: SettingsDep) -> MultimodalService:
+    return build_multimodal_service(settings)
 
 
 def get_graphrag_service(
@@ -423,6 +429,7 @@ ChapterServiceDep = Annotated[ChapterService, Depends(get_chapter_service)]
 GenerationServiceDep = Annotated[GenerationService, Depends(get_generation_service)]
 MemoryServiceDep = Annotated[MemoryService, Depends(get_memory_service)]
 GraphRagServiceDep = Annotated[GraphRagService, Depends(get_graphrag_service)]
+MultimodalServiceDep = Annotated[MultimodalService, Depends(get_multimodal_service)]
 AuditServiceDep = Annotated[AuditService, Depends(get_audit_service)]
 AnalysisServiceDep = Annotated[AnalysisService, Depends(get_analysis_service)]
 LibraryServiceDep = Annotated[LibraryService, Depends(get_library_service)]

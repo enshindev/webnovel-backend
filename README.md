@@ -34,6 +34,7 @@ AI 不能直接改正文，也不能直接改设定库。正文走草稿采纳�
 - 故事助手和资料库是实验功能，接口挂在 `/api/v1/experiments` 下；agent 接口在 `/api/v1/agent`，也还在实验阶段。
 - 助手和 agent 的只读工具除了检索章节、查实体，也能查故事事件、`who_knows` 和一跳实体关系。
 - GraphRAG 实验：从实体出发做 1–2 跳扩展，返回节点、关系和关联事件子图。
+- 多模态实验：ASR 转写、TTS 语音、封面生成，走可配置的 OpenAI 兼容接口。
 
 ## 几个取舍
 
@@ -170,6 +171,9 @@ API 和 worker 都在 compose 里，启动时会自动跑 Alembic 迁移。数�
 | `CORS_ORIGINS` | 逗号分隔的允许来源，留空不启用 |
 | `LOG_JSON` | 生产环境可设为 `true`，输出 JSON 日志 |
 | `LOG_LEVEL` | 日志级别，默认 `INFO` |
+| `ASR_BASE_URL` / `ASR_MODEL` | 语音转写实验接口 |
+| `TTS_BASE_URL` / `TTS_MODEL` | 语音合成实验接口 |
+| `IMAGE_BASE_URL` / `IMAGE_MODEL` | 封面生成实验接口 |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP trace 地址，例如 `http://localhost:4318/v1/traces` |
 
 完整列表见 [`.env.example`](.env.example)。

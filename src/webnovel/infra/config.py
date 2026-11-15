@@ -43,6 +43,17 @@ class Settings(BaseSettings):
     embedding_timeout_seconds: float = 30.0
     rerank_timeout_seconds: float = 30.0
 
+    asr_base_url: str = ""
+    asr_api_key: str = ""
+    asr_model: str = ""
+    tts_base_url: str = ""
+    tts_api_key: str = ""
+    tts_model: str = ""
+    tts_voice: str = "alloy"
+    image_base_url: str = ""
+    image_api_key: str = ""
+    image_model: str = ""
+
     otel_exporter_otlp_endpoint: str | None = None
     context_max_tokens: int = 16_000
     prompts_dir: Path = Path("prompts")

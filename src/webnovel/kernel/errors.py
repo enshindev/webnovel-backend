@@ -28,3 +28,8 @@ class ConflictError(WebnovelError):
 class ValidationError(WebnovelError):
     code = "validation.failed"
     status = 422
+
+
+class UnavailableError(WebnovelError):
+    code = "service.unavailable"
+    status = 503
