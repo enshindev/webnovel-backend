@@ -10,7 +10,7 @@ from webnovel.modules.chapters_versions.contract import ChapterService
 from webnovel.modules.export.contract import ExportJob, ExportService
 from webnovel.modules.export.gate import evaluate_gate
 from webnovel.modules.export.repository import ExportRepository
-from webnovel.modules.multimodal.contract import SpeechProvider
+from webnovel.modules.multimodal.contract import CoverProvider, SpeechProvider
 from webnovel.modules.outbox.contract import OutboxService
 from webnovel.modules.quality.contract import QualityService
 from webnovel.modules.works.contract import WorkService
@@ -28,6 +28,7 @@ class ExportServiceImpl(ExportService):
         audit: AuditRecorder | None = None,
         outbox: OutboxService | None = None,
         speech: SpeechProvider | None = None,
+        cover: CoverProvider | None = None,
     ) -> None:
         self._repository = repository
         self._chapter_service = chapter_service
@@ -37,13 +38,18 @@ class ExportServiceImpl(ExportService):
         self._audit = audit
         self._outbox = outbox
         self._speech = speech
+        self._cover = cover
 
     async def create(self, work_id: UUID, fmt: str) -> ExportJob:
-        if fmt not in {"txt", "docx", "mp3"}:
+        if fmt not in {"txt", "docx", "mp3", "cover"}:
             raise ValidationError("unsupported export format", code="export.unsupported_format")
         if fmt == "mp3" and self._speech is None:
             raise UnavailableError(
                 "mp3 export requires TTS configuration", code="export.tts_unavailable"
+            )
+        if fmt == "cover" and self._cover is None:
+            raise UnavailableError(
+                "cover export requires image configuration", code="export.cover_unavailable"
             )
         if fmt == "docx" and find_spec("docx") is None:
             raise ValidationError(

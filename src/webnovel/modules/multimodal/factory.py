@@ -30,16 +30,18 @@ def build_speech_provider(settings: Settings) -> OpenAICompatibleTTS | None:
     )
 
 
+def build_cover_provider(settings: Settings) -> OpenAICompatibleCover | None:
+    if not settings.image_base_url or not settings.image_model:
+        return None
+    return OpenAICompatibleCover(
+        base_url=settings.image_base_url,
+        api_key=settings.image_api_key,
+        model=settings.image_model,
+    )
+
+
 def build_multimodal_service(settings: Settings) -> MultimodalService:
     asr = build_transcription_provider(settings)
     tts = build_speech_provider(settings)
-    cover = (
-        OpenAICompatibleCover(
-            base_url=settings.image_base_url,
-            api_key=settings.image_api_key,
-            model=settings.image_model,
-        )
-        if settings.image_base_url and settings.image_model
-        else None
-    )
+    cover = build_cover_provider(settings)
     return MultimodalService(asr=asr, tts=tts, cover=cover)

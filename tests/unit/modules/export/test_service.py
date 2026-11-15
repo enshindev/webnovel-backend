@@ -94,3 +94,19 @@ async def test_mp3_export_requires_tts() -> None:
         assert exc.code == "export.tts_unavailable"
     else:
         raise AssertionError("expected UnavailableError")
+
+
+async def test_cover_export_requires_image_provider() -> None:
+    work_id = uuid4()
+    service = ExportServiceImpl(
+        FakeExportRepository(),
+        chapter_service=FakeChapterService([]),
+        quality_service=FakeQualityService([]),
+        work_service=FakeWorkService(),
+    )
+    try:
+        await service.create(work_id, "cover")
+    except UnavailableError as exc:
+        assert exc.code == "export.cover_unavailable"
+    else:
+        raise AssertionError("expected UnavailableError")

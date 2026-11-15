@@ -66,6 +66,7 @@ from webnovel.modules.memory.repository import SqlAlchemyMemoryRepository
 from webnovel.modules.memory.retrieval import MemoryVectorService
 from webnovel.modules.memory.service import MemoryServiceImpl
 from webnovel.modules.multimodal.factory import (
+    build_cover_provider,
     build_multimodal_service,
     build_speech_provider,
     build_transcription_provider,
@@ -396,6 +397,7 @@ def get_export_service(
         audit=audit,
         outbox=outbox,
         speech=build_speech_provider(settings),
+        cover=build_cover_provider(settings),
     )
 
 

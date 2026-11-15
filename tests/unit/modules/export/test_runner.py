@@ -49,6 +49,12 @@ class FakeSpeech:
         return b"ID3audio"
 
 
+class FakeCover:
+    async def generate(self, prompt: str, size: str = "1024x1024") -> bytes:
+        assert "长夜灯火" in prompt
+        return b"\x89PNGcover"
+
+
 async def test_mp3_export_writes_audio_file(tmp_path: Path) -> None:
     now = datetime.now(UTC)
     work_id = uuid4()
@@ -95,3 +101,59 @@ async def test_mp3_export_writes_audio_file(tmp_path: Path) -> None:
     status, path = repository.finished
     assert status is ExportStatus.SUCCEEDED
     assert path is not None and Path(path).read_bytes() == b"ID3audio"
+
+
+async def test_cover_export_writes_image_file(tmp_path: Path) -> None:
+    now = datetime.now(UTC)
+    work_id = uuid4()
+    job = ExportJob(
+        id=uuid4(),
+        work_id=work_id,
+        format="cover",
+        status=ExportStatus.QUEUED,
+        file_path=None,
+        created_at=now,
+    )
+    repository = FakeRepository(job)
+    runner = ExportRunner(
+        repository=repository,  # type: ignore[arg-type]
+        chapter_service=FakeChapters(_chapter(), _version()),  # type: ignore[arg-type]
+        work_service=FakeWorks(),  # type: ignore[arg-type]
+        settings=Settings(export_dir=tmp_path),
+        cover=FakeCover(),
+    )
+
+    await runner.run(job.id)
+
+    assert repository.finished is not None
+    status, path = repository.finished
+    assert status is ExportStatus.SUCCEEDED
+    assert path is not None and Path(path).read_bytes() == b"\x89PNGcover"
+
+
+def _chapter() -> Chapter:
+    now = datetime.now(UTC)
+    return Chapter(
+        id=uuid4(),
+        work_id=uuid4(),
+        number=1,
+        title="雨夜",
+        current_version_id=uuid4(),
+        lock_version=1,
+        word_count=2,
+        created_at=now,
+        updated_at=now,
+    )
+
+
+def _version() -> ChapterVersion:
+    now = datetime.now(UTC)
+    return ChapterVersion(
+        id=uuid4(),
+        chapter_id=uuid4(),
+        parent_version_id=None,
+        content="雨夜。",
+        content_hash="hash",
+        source="manual",
+        created_at=now,
+    )

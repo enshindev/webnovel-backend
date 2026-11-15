@@ -15,7 +15,7 @@ router = APIRouter(tags=["export"])
 
 
 class ExportCreate(BaseModel):
-    format: Literal["txt", "docx", "mp3"] = "txt"
+    format: Literal["txt", "docx", "mp3", "cover"] = "txt"
 
 
 class ExportJobOut(BaseModel):
@@ -66,5 +66,7 @@ async def download_export(
     media = {
         ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         ".mp3": "audio/mpeg",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
     }.get(suffix, "text/plain")
     return FileResponse(path, filename=f"work-{job.work_id}{suffix}", media_type=media)

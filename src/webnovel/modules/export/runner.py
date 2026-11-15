@@ -7,7 +7,7 @@ from webnovel.modules.chapters_versions.contract import ChapterService
 from webnovel.modules.export.contract import ExportStatus
 from webnovel.modules.export.render import render_docx, render_txt
 from webnovel.modules.export.repository import ExportRepository
-from webnovel.modules.multimodal.contract import SpeechProvider
+from webnovel.modules.multimodal.contract import CoverProvider, SpeechProvider
 from webnovel.modules.works.contract import WorkService
 
 DISCLOSURE = (
@@ -25,12 +25,14 @@ class ExportRunner:
         work_service: WorkService,
         settings: Settings,
         speech: SpeechProvider | None = None,
+        cover: CoverProvider | None = None,
     ) -> None:
         self._repository = repository
         self._chapter_service = chapter_service
         self._work_service = work_service
         self._settings = settings
         self._speech = speech
+        self._cover = cover
 
     async def run(self, job_id: UUID) -> None:
         job = await self._repository.get(job_id)
@@ -63,6 +65,16 @@ class ExportRunner:
                 for start in range(0, len(text), 3_000):
                     audio.extend(await self._speech.synthesize(text[start : start + 3_000]))
                 path.write_bytes(bytes(audio))
+            elif job.format == "cover":
+                if self._cover is None:
+                    raise RuntimeError("image provider is not configured")
+                prompt = (
+                    f"中文网文封面，竖版，标题《{work.title}》，题材：{work.genre or '未设'}，"
+                    "氛围克制，留出标题空间"
+                )
+                image = await self._cover.generate(prompt, "1024x1536")
+                path = self._settings.export_dir / f"{job.id}.png"
+                path.write_bytes(image)
             elif job.format == "docx":
                 path = self._settings.export_dir / f"{job.id}.docx"
                 render_docx(
