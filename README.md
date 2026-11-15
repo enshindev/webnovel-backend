@@ -33,6 +33,7 @@ AI 不能直接改正文，也不能直接改设定库。正文走草稿采纳�
 - OTel span、Prometheus 指标、outbox 重试和 hash 链审计日志。
 - 故事助手和资料库是实验功能，接口挂在 `/api/v1/experiments` 下；agent 接口在 `/api/v1/agent`，也还在实验阶段。
 - 助手和 agent 的只读工具除了检索章节、查实体，也能查故事事件、`who_knows` 和一跳实体关系。
+- GraphRAG 实验：从实体出发做 1–2 跳扩展，返回节点、关系和关联事件子图。
 
 ## 几个取舍
 

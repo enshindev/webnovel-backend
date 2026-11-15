@@ -52,6 +52,7 @@ from webnovel.modules.export.service import ExportServiceImpl
 from webnovel.modules.generation.contract import GenerationService
 from webnovel.modules.generation.repository import SqlAlchemyGenerationRepository
 from webnovel.modules.generation.service import GenerationsService
+from webnovel.modules.graphrag.service import GraphRagService
 from webnovel.modules.library.contract import LibraryService
 from webnovel.modules.library.repository import SqlAlchemyLibraryRepository
 from webnovel.modules.library.service import LibraryServiceImpl
@@ -241,6 +242,12 @@ def get_memory_service(session: SessionDep, settings: SettingsDep) -> MemoryServ
     return MemoryServiceImpl(SqlAlchemyMemoryRepository(session), queue.enqueue_extraction, indexer)
 
 
+def get_graphrag_service(
+    memory: Annotated[MemoryService, Depends(get_memory_service)],
+) -> GraphRagService:
+    return GraphRagService(memory)
+
+
 def get_assistant_service(
     session: SessionDep,
     work_service: Annotated[WorkService, Depends(get_work_service)],
@@ -415,6 +422,7 @@ WorkServiceDep = Annotated[WorkService, Depends(get_work_service)]
 ChapterServiceDep = Annotated[ChapterService, Depends(get_chapter_service)]
 GenerationServiceDep = Annotated[GenerationService, Depends(get_generation_service)]
 MemoryServiceDep = Annotated[MemoryService, Depends(get_memory_service)]
+GraphRagServiceDep = Annotated[GraphRagService, Depends(get_graphrag_service)]
 AuditServiceDep = Annotated[AuditService, Depends(get_audit_service)]
 AnalysisServiceDep = Annotated[AnalysisService, Depends(get_analysis_service)]
 LibraryServiceDep = Annotated[LibraryService, Depends(get_library_service)]
