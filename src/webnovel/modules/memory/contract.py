@@ -77,6 +77,16 @@ class ResolvedProposal:
 
 
 @dataclass(frozen=True, slots=True)
+class EntityRelation:
+    id: UUID
+    work_id: UUID
+    from_entity_id: UUID
+    to_entity_id: UUID
+    relation_type: str
+    since_chapter_id: UUID | None
+
+
+@dataclass(frozen=True, slots=True)
 class StoryEvent:
     id: UUID
     work_id: UUID
@@ -221,6 +231,10 @@ class MemoryService(Protocol):
     ) -> list[KnowledgeState]: ...
 
     async def contradictions(self, work_id: UUID) -> list[Contradiction]: ...
+
+    async def list_relations(
+        self, work_id: UUID, entity_id: UUID | None = None
+    ) -> list[EntityRelation]: ...
 
     async def create_foreshadow(
         self,

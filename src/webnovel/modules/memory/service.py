@@ -11,6 +11,7 @@ from webnovel.modules.memory.contract import (
     ChangeProposal,
     Contradiction,
     Entity,
+    EntityRelation,
     ExtractionRun,
     Foreshadow,
     KnowledgeState,
@@ -119,6 +120,11 @@ class MemoryServiceImpl(MemoryService):
     async def contradictions(self, work_id: UUID) -> list[Contradiction]:
         events = await self._repository.list_story_events(work_id)
         return detect_contradictions(events)
+
+    async def list_relations(
+        self, work_id: UUID, entity_id: UUID | None = None
+    ) -> list[EntityRelation]:
+        return await self._repository.list_relations(work_id, entity_id)
 
     async def list_timeline(self, work_id: UUID) -> list[TimelineEvent]:
         return await self._repository.list_timeline(work_id)

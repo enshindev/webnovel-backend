@@ -140,6 +140,21 @@ class ContradictionList(BaseModel):
     items: list[ContradictionOut]
 
 
+class EntityRelationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    work_id: UUID
+    from_entity_id: UUID
+    to_entity_id: UUID
+    relation_type: str
+    since_chapter_id: UUID | None
+
+
+class EntityRelationList(BaseModel):
+    items: list[EntityRelationOut]
+
+
 class ForeshadowCreate(BaseModel):
     description: str = Field(min_length=1, max_length=4_000)
     planted_chapter_id: UUID | None = None
@@ -270,6 +285,18 @@ async def list_story_events(
         work_id, from_chapter=from_chapter, to_chapter=to_chapter
     )
     return StoryEventList(items=[StoryEventOut.model_validate(event) for event in events])
+
+
+@router.get("/works/{work_id}/story-state/relations", response_model=EntityRelationList)
+async def list_relations(
+    work_id: UUID,
+    service: MemoryServiceDep,
+    entity_id: UUID | None = None,
+) -> EntityRelationList:
+    relations = await service.list_relations(work_id, entity_id)
+    return EntityRelationList(
+        items=[EntityRelationOut.model_validate(relation) for relation in relations]
+    )
 
 
 @router.get("/works/{work_id}/story-state/contradictions", response_model=ContradictionList)

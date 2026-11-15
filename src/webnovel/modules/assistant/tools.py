@@ -104,6 +104,18 @@ class AssistantTools:
                     },
                 },
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_relations",
+                    "description": "查某个角色或实体的关系，一跳",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"name": {"type": "string"}},
+                        "required": ["name"],
+                    },
+                },
+            },
         ]
 
     async def execute(self, name: str, work_id: UUID, arguments: str) -> ToolExecution:
@@ -161,6 +173,34 @@ class AssistantTools:
                         "quote": f"{state.character_name} {state.state} {state.fact_key}",
                     }
                     for state in states
+                ],
+            )
+        if name == "get_relations":
+            if self._story_state is None:
+                return ToolExecution(text="故事状态暂不可用。")
+            entity = await self.get_entity(work_id, str(args.get("name", "")))
+            if entity is None:
+                return ToolExecution(text="没有找到该实体。")
+            relations = await self._story_state.list_relations(work_id, entity.id)
+            if not relations:
+                return ToolExecution(text="没有找到该实体的关系。")
+            entities = await self._memory_repository.list_entities(work_id)
+            names = {item.id: item.name for item in entities}
+            lines = [
+                f"{names.get(relation.from_entity_id, relation.from_entity_id)} -> "
+                f"{names.get(relation.to_entity_id, relation.to_entity_id)}"
+                f"（{relation.relation_type}）"
+                for relation in relations
+            ]
+            return ToolExecution(
+                text="\n".join(lines),
+                citations=[
+                    {
+                        "source": "entity_relation",
+                        "ref": f"entity_relation:{relation.id}",
+                        "quote": relation.relation_type,
+                    }
+                    for relation in relations
                 ],
             )
         if name == "get_story_events":

@@ -5,13 +5,14 @@ from datetime import UTC, datetime
 from typing import Any, Protocol, cast
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from webnovel.kernel.errors import ConflictError
 from webnovel.modules.memory.contract import (
     ChangeProposal,
     Entity,
+    EntityRelation,
     ExtractionRun,
     ExtractionStatus,
     Foreshadow,
@@ -25,6 +26,7 @@ from webnovel.modules.memory.contract import (
 from webnovel.modules.memory.models import (
     ChangeProposalModel,
     EntityModel,
+    EntityRelationModel,
     EntityRevisionModel,
     ExtractionRunModel,
     ExtractionStepModel,
@@ -146,6 +148,10 @@ class MemoryRepository(Protocol):
     async def who_knows(
         self, work_id: UUID, fact_key: str, at_chapter: int | None = None
     ) -> list[KnowledgeState]: ...
+
+    async def list_relations(
+        self, work_id: UUID, entity_id: UUID | None = None
+    ) -> list[EntityRelation]: ...
 
     async def add_foreshadow(
         self,
@@ -710,6 +716,21 @@ class SqlAlchemyMemoryRepository:
             state for state in _latest_knowledge(models) if state.state in {"knows", "suspects"}
         ]
 
+    async def list_relations(
+        self, work_id: UUID, entity_id: UUID | None = None
+    ) -> list[EntityRelation]:
+        stmt = select(EntityRelationModel).where(EntityRelationModel.work_id == work_id)
+        if entity_id is not None:
+            stmt = stmt.where(
+                or_(
+                    EntityRelationModel.from_entity_id == entity_id,
+                    EntityRelationModel.to_entity_id == entity_id,
+                )
+            )
+        stmt = stmt.order_by(EntityRelationModel.created_at, EntityRelationModel.id)
+        models = (await self._session.scalars(stmt)).all()
+        return [_relation_to_domain(model) for model in models]
+
     async def get_entity(self, entity_id: UUID) -> Entity | None:
         model = await self._session.get(EntityModel, entity_id)
         return _entity_to_domain(model) if model is not None else None
@@ -843,3 +864,14 @@ def _latest_knowledge(models: Sequence[KnowledgeStateModel]) -> list[KnowledgeSt
         seen.add(key)
         result.append(_knowledge_to_domain(model))
     return result
+
+
+def _relation_to_domain(model: EntityRelationModel) -> EntityRelation:
+    return EntityRelation(
+        id=model.id,
+        work_id=model.work_id,
+        from_entity_id=model.from_entity_id,
+        to_entity_id=model.to_entity_id,
+        relation_type=model.relation_type,
+        since_chapter_id=model.since_chapter_id,
+    )
