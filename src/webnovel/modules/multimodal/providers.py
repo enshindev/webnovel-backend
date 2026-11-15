@@ -4,6 +4,20 @@ import base64
 
 import httpx
 
+from webnovel.llm.gateway.errors import ErrorClass, GatewayError
+
+
+def _raise_gateway_error(exc: httpx.HTTPError) -> None:
+    if isinstance(exc, httpx.HTTPStatusError):
+        status = exc.response.status_code
+        error_class = (
+            ErrorClass.UPSTREAM_UNAVAILABLE if status >= 500 else ErrorClass.INVALID_REQUEST
+        )
+        raise GatewayError(error_class, str(exc), code_raw=str(status)) from exc
+    if isinstance(exc, httpx.TimeoutException):
+        raise GatewayError(ErrorClass.TIMEOUT, str(exc)) from exc
+    raise GatewayError(ErrorClass.UPSTREAM_UNAVAILABLE, str(exc)) from exc
+
 
 class OpenAICompatibleASR:
     def __init__(self, *, base_url: str, api_key: str, model: str, timeout: float = 120.0) -> None:
@@ -14,15 +28,19 @@ class OpenAICompatibleASR:
 
     async def transcribe(self, filename: str, content_type: str, data: bytes) -> str:
         headers = {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
-        async with httpx.AsyncClient(base_url=self._base_url, headers=headers) as client:
-            response = await client.post(
-                "/audio/transcriptions",
-                data={"model": self._model},
-                files={"file": (filename, data, content_type or "application/octet-stream")},
-                timeout=self._timeout,
-            )
-            response.raise_for_status()
-            return str(response.json().get("text", "")).strip()
+        try:
+            async with httpx.AsyncClient(base_url=self._base_url, headers=headers) as client:
+                response = await client.post(
+                    "/audio/transcriptions",
+                    data={"model": self._model},
+                    files={"file": (filename, data, content_type or "application/octet-stream")},
+                    timeout=self._timeout,
+                )
+                response.raise_for_status()
+                return str(response.json().get("text", "")).strip()
+        except httpx.HTTPError as exc:
+            _raise_gateway_error(exc)
+            raise
 
 
 class OpenAICompatibleTTS:
@@ -43,18 +61,22 @@ class OpenAICompatibleTTS:
 
     async def synthesize(self, text: str, voice: str | None = None) -> bytes:
         headers = {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
-        async with httpx.AsyncClient(base_url=self._base_url, headers=headers) as client:
-            response = await client.post(
-                "/audio/speech",
-                json={
-                    "model": self._model,
-                    "input": text,
-                    "voice": voice or self._default_voice,
-                },
-                timeout=self._timeout,
-            )
-            response.raise_for_status()
-            return response.content
+        try:
+            async with httpx.AsyncClient(base_url=self._base_url, headers=headers) as client:
+                response = await client.post(
+                    "/audio/speech",
+                    json={
+                        "model": self._model,
+                        "input": text,
+                        "voice": voice or self._default_voice,
+                    },
+                    timeout=self._timeout,
+                )
+                response.raise_for_status()
+                return response.content
+        except httpx.HTTPError as exc:
+            _raise_gateway_error(exc)
+            raise
 
 
 class OpenAICompatibleCover:
@@ -66,18 +88,22 @@ class OpenAICompatibleCover:
 
     async def generate(self, prompt: str, size: str = "1024x1024") -> bytes:
         headers = {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
-        async with httpx.AsyncClient(base_url=self._base_url, headers=headers) as client:
-            response = await client.post(
-                "/images/generations",
-                json={"model": self._model, "prompt": prompt, "n": 1, "size": size},
-                timeout=self._timeout,
-            )
-            response.raise_for_status()
-            item = (response.json().get("data") or [{}])[0]
-            if item.get("b64_json"):
-                return base64.b64decode(item["b64_json"])
-            if item.get("url"):
-                image = await client.get(str(item["url"]), timeout=self._timeout)
-                image.raise_for_status()
-                return image.content
+        try:
+            async with httpx.AsyncClient(base_url=self._base_url, headers=headers) as client:
+                response = await client.post(
+                    "/images/generations",
+                    json={"model": self._model, "prompt": prompt, "n": 1, "size": size},
+                    timeout=self._timeout,
+                )
+                response.raise_for_status()
+                item = (response.json().get("data") or [{}])[0]
+                if item.get("b64_json"):
+                    return base64.b64decode(item["b64_json"])
+                if item.get("url"):
+                    image = await client.get(str(item["url"]), timeout=self._timeout)
+                    image.raise_for_status()
+                    return image.content
+        except httpx.HTTPError as exc:
+            _raise_gateway_error(exc)
+            raise
         raise ValueError("image provider returned no data")

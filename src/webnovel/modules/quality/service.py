@@ -2,17 +2,21 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
-from typing import Any
 from uuid import UUID, uuid4
+
+import structlog
 
 from webnovel.kernel.errors import NotFoundError, ValidationError
 from webnovel.modules.audit.contract import AuditRecorder
 from webnovel.modules.chapters_versions.contract import ChapterService
+from webnovel.modules.memory.contract import Contradiction
 from webnovel.modules.outbox.contract import OutboxService
 from webnovel.modules.quality.checker import check_chapter as run_machine_check
 from webnovel.modules.quality.contract import QualityIssue, QualityReport, QualityService
 from webnovel.modules.quality.repository import QualityRepository
 from webnovel.modules.quality.rules import PlatformRules
+
+logger = structlog.get_logger(__name__)
 
 
 class QualityServiceImpl(QualityService):
@@ -24,7 +28,7 @@ class QualityServiceImpl(QualityService):
         enqueue: Callable[[UUID], Awaitable[None]] | None = None,
         audit: AuditRecorder | None = None,
         outbox: OutboxService | None = None,
-        contradictions: Callable[[UUID], Awaitable[list[Any]]] | None = None,
+        contradictions: Callable[[UUID], Awaitable[list[Contradiction]]] | None = None,
     ) -> None:
         self._repository = repository
         self._chapter_service = chapter_service
@@ -64,7 +68,7 @@ class QualityServiceImpl(QualityService):
                         )
                     )
             except Exception:
-                pass
+                logger.exception("quality.contradiction_check_failed", work_id=str(work_id))
         status = result.status
         if any(issue.severity == "P0" for issue in issues):
             status = "failed"

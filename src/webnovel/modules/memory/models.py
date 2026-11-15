@@ -203,7 +203,7 @@ class TimelineEventModel(UUIDPrimaryKeyMixin, Base):
     )
 
 
-class StoryEventModel(UUIDPrimaryKeyMixin, Base):
+class StoryEventModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "story_events"
 
     work_id: Mapped[UUID] = mapped_column(ForeignKey("works.id", ondelete="CASCADE"))
@@ -219,12 +219,9 @@ class StoryEventModel(UUIDPrimaryKeyMixin, Base):
     source_span: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     status: Mapped[str] = mapped_column(String(16), default="inferred")
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
 
 
-class KnowledgeStateModel(UUIDPrimaryKeyMixin, Base):
+class KnowledgeStateModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "knowledge_states"
 
     work_id: Mapped[UUID] = mapped_column(ForeignKey("works.id", ondelete="CASCADE"))

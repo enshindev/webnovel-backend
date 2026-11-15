@@ -304,7 +304,7 @@ uv run webnovel prompt-promote generation/continuation 2 --note "开头更稳"
 
 已经能用的：生成主流程、章节版本、记忆抽取、检索、质检、导出、文风声纹、反向大纲、工作流、用量账本、审计、outbox。
 
-还没做：多模态（ASR、TTS、封面）、本地模型、GraphRAG、正式前端。生产镜像已经放在 `Dockerfile` 和 `compose.yaml`，但没有做 TLS、托管备份这些运维配套。
+还没做：正式前端。多模态、本地模型、GraphRAG 已有实验接入层，但需要真实供应商配置和进一步评测；生产环境也还没做 TLS、托管备份这些运维配套。
 
 接口还没稳定。设计文档（架构、ADR、DDL）没有随仓库公开，实际接口以 `/docs` 为准。
 

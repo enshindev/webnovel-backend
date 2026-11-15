@@ -3,7 +3,17 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import JSON, BigInteger, DateTime, Float, ForeignKey, String, Text, func
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    DateTime,
+    Float,
+    ForeignKey,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from webnovel.infra.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -29,6 +39,11 @@ class GenerationModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class DraftModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "drafts"
+    __table_args__ = (
+        UniqueConstraint(
+            "generation_id", "candidate_index", name="uq_drafts_generation_id_candidate_index"
+        ),
+    )
 
     work_id: Mapped[UUID] = mapped_column(ForeignKey("works.id", ondelete="CASCADE"))
     chapter_id: Mapped[UUID] = mapped_column(ForeignKey("chapters.id", ondelete="CASCADE"))

@@ -356,7 +356,7 @@ def get_quality_service(
         queue.enqueue_review,
         audit,
         outbox,
-        memory.contradictions,
+        memory.contradictions if settings.story_state_contradictions_in_quality else None,
     )
 
 

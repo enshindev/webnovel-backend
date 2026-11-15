@@ -29,9 +29,8 @@ def upgrade() -> None:
         "drafts",
         ["generation_id", "candidate_index"],
     )
-
-
-def downgrade() -> None:
-    op.drop_index("ix_drafts_generation_id_candidate_index", table_name="drafts")
-    op.drop_column("drafts", "candidate_index")
-    op.create_unique_constraint("uq_drafts_generation_id", "drafts", ["generation_id"])
+    op.create_unique_constraint(
+        "uq_drafts_generation_id_candidate_index",
+        "drafts",
+        ["generation_id", "candidate_index"],
+    )

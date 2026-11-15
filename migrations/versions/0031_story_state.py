@@ -41,6 +41,12 @@ def upgrade() -> None:
             server_default=sa.func.now(),
             nullable=False,
         ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(
             ["work_id"], ["works.id"], name="fk_story_events_work_id_works", ondelete="CASCADE"
         ),
@@ -85,6 +91,12 @@ def upgrade() -> None:
             server_default=sa.func.now(),
             nullable=False,
         ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(
             ["work_id"], ["works.id"], name="fk_knowledge_states_work_id_works", ondelete="CASCADE"
         ),
@@ -118,11 +130,3 @@ def upgrade() -> None:
         "knowledge_states",
         ["work_id", "character_id"],
     )
-
-
-def downgrade() -> None:
-    op.drop_index("ix_knowledge_states_work_id_character_id", table_name="knowledge_states")
-    op.drop_index("ix_knowledge_states_work_id_fact_key", table_name="knowledge_states")
-    op.drop_table("knowledge_states")
-    op.drop_index("ix_story_events_work_id_chapter_number", table_name="story_events")
-    op.drop_table("story_events")

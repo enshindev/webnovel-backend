@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     llm_provider: str = "openai-compatible"
     daily_budget: float | None = None
     assistant_enabled: bool = True
+    story_state_contradictions_in_quality: bool = False
     api_token: str = ""
     rate_limit_per_minute: int = 0
     cors_origins: str = ""

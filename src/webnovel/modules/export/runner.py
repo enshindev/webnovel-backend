@@ -3,6 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from webnovel.infra.config import Settings
+from webnovel.kernel.errors import UnavailableError
 from webnovel.modules.chapters_versions.contract import ChapterService
 from webnovel.modules.export.contract import ExportStatus
 from webnovel.modules.export.render import render_docx, render_txt
@@ -59,7 +60,7 @@ class ExportRunner:
             self._settings.export_dir.mkdir(parents=True, exist_ok=True)
             if job.format == "mp3":
                 if self._speech is None:
-                    raise RuntimeError("TTS is not configured")
+                    raise UnavailableError("TTS is not configured", code="export.tts_unavailable")
                 path = self._settings.export_dir / f"{job.id}.mp3"
                 audio = bytearray()
                 for start in range(0, len(text), 3_000):
@@ -67,7 +68,9 @@ class ExportRunner:
                 path.write_bytes(bytes(audio))
             elif job.format == "cover":
                 if self._cover is None:
-                    raise RuntimeError("image provider is not configured")
+                    raise UnavailableError(
+                        "image provider is not configured", code="export.cover_unavailable"
+                    )
                 prompt = (
                     f"中文网文封面，竖版，标题《{work.title}》，题材：{work.genre or '未设'}，"
                     "氛围克制，留出标题空间"

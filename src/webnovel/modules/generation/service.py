@@ -11,6 +11,7 @@ from webnovel.kernel.errors import ConflictError, NotFoundError, ValidationError
 from webnovel.modules.audit.contract import AuditRecorder
 from webnovel.modules.chapters_versions.contract import ChapterService
 from webnovel.modules.generation.contract import (
+    MAX_CANDIDATE_COUNT,
     AcceptedDraft,
     Draft,
     DraftStatus,
@@ -65,7 +66,7 @@ class GenerationsService:
                 "target_words must be between 100 and 20000",
                 code="generation.invalid_target_words",
             )
-        if not 1 <= command.candidate_count <= 4:
+        if not 1 <= command.candidate_count <= MAX_CANDIDATE_COUNT:
             raise ValidationError(
                 "candidate_count must be between 1 and 4",
                 code="generation.invalid_candidate_count",
@@ -147,7 +148,7 @@ class GenerationsService:
             task_type=original.task_type,
             instruction=original.instruction,
             target_words=original.target_words,
-            candidate_count=max(1, min(4, len(previous))),
+            candidate_count=max(1, min(MAX_CANDIDATE_COUNT, len(previous))),
         )
         return await self.create(command, f"retry:{generation_id.hex[:16]}:{uuid4().hex[:16]}")
 

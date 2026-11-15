@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 import typer
 import uvicorn
@@ -218,6 +217,7 @@ def prompt_promote(
     from webnovel.modules.prompts.promotion import promote_label
     from webnovel.modules.prompts.repository import SqlAlchemyPromptCatalogRepository
     from webnovel.modules.prompts.service import PromptCatalogService
+    from webnovel.modules.quality.contract import EvalRunInfo
     from webnovel.modules.quality.eval_repository import SqlAlchemyEvalRepository
 
     settings = get_settings()
@@ -235,10 +235,10 @@ def prompt_promote(
             typer.echo(f"invalid eval run id: {eval_run_id}", err=True)
             raise typer.Exit(code=2) from exc
 
-    run: dict[str, Any] | None = None
+    run: EvalRunInfo | None = None
     if not force:
 
-        async def load_run() -> dict[str, Any] | None:
+        async def load_run() -> EvalRunInfo | None:
             async with session_factory() as session:
                 repository = SqlAlchemyEvalRepository(session)
                 if run_id is not None:
@@ -252,14 +252,14 @@ def prompt_promote(
                 err=True,
             )
             raise typer.Exit(code=1)
-        metrics = run.get("metrics") or {}
-        if run.get("status") != "succeeded" or metrics.get("gate") != "passed":
+        metrics = run.metrics
+        if run.status != "succeeded" or metrics.get("gate") != "passed":
             typer.echo(
-                f"eval gate is not passed (status={run.get('status')}, metrics={metrics})",
+                f"eval gate is not passed (status={run.status}, metrics={metrics})",
                 err=True,
             )
             raise typer.Exit(code=1)
-        if run.get("prompt_name") != prompt_id or run.get("prompt_version") != version:
+        if run.prompt_name != prompt_id or run.prompt_version != version:
             typer.echo(
                 "eval run does not match this prompt version; use --force if you are sure",
                 err=True,

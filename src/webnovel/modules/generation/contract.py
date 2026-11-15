@@ -8,6 +8,8 @@ from uuid import UUID
 
 from webnovel.modules.chapters_versions.contract import ChapterVersion
 
+MAX_CANDIDATE_COUNT = 4
+
 
 class TaskType(StrEnum):
     CONTINUE = "continue"

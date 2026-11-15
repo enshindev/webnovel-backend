@@ -12,7 +12,12 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from webnovel.entrypoints.api.deps import BudgetGuardDep, GenerationServiceDep, RedisDep
-from webnovel.modules.generation.contract import TERMINAL, GenerationCreate, TaskType
+from webnovel.modules.generation.contract import (
+    MAX_CANDIDATE_COUNT,
+    TERMINAL,
+    GenerationCreate,
+    TaskType,
+)
 
 router = APIRouter(tags=["generation"])
 
@@ -22,7 +27,7 @@ class GenerationCreateBody(BaseModel):
     task_type: TaskType
     instruction: str | None = Field(default=None, max_length=4000)
     target_words: int | None = Field(default=None, ge=100, le=20_000)
-    candidate_count: int = Field(default=1, ge=1, le=4)
+    candidate_count: int = Field(default=1, ge=1, le=MAX_CANDIDATE_COUNT)
 
 
 class GenerationOut(BaseModel):

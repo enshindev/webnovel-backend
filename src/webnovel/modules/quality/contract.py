@@ -7,6 +7,16 @@ from uuid import UUID
 
 
 @dataclass(frozen=True, slots=True)
+class EvalRunInfo:
+    id: UUID
+    task: str
+    prompt_name: str | None
+    prompt_version: int | None
+    status: str
+    metrics: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
 class QualityIssue:
     code: str
     severity: str

@@ -6,6 +6,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from webnovel.modules.quality.contract import EvalRunInfo
 from webnovel.modules.quality.models import EvalCaseResultModel, EvalRunModel
 
 
@@ -28,9 +29,9 @@ class EvalRepository(Protocol):
         results: list[dict[str, Any]],
     ) -> None: ...
 
-    async def latest_run(self, prompt_name: str, prompt_version: int) -> dict[str, Any] | None: ...
+    async def latest_run(self, prompt_name: str, prompt_version: int) -> EvalRunInfo | None: ...
 
-    async def get_run(self, run_id: UUID) -> dict[str, Any] | None: ...
+    async def get_run(self, run_id: UUID) -> EvalRunInfo | None: ...
 
 
 class SqlAlchemyEvalRepository:
@@ -57,12 +58,12 @@ class SqlAlchemyEvalRepository:
         await self._session.flush()
         return model_row.id
 
-    async def latest_run(self, prompt_name: str, prompt_version: int) -> dict[str, Any] | None:
+    async def latest_run(self, prompt_name: str, prompt_version: int) -> EvalRunInfo | None:
         return await _latest_run_for(self._session, prompt_name, prompt_version)
 
-    async def get_run(self, run_id: UUID) -> dict[str, Any] | None:
+    async def get_run(self, run_id: UUID) -> EvalRunInfo | None:
         row = await self._session.get(EvalRunModel, run_id)
-        return _run_dict(row) if row is not None else None
+        return _run_info(row) if row is not None else None
 
     async def finish_run(
         self,
@@ -91,20 +92,20 @@ class SqlAlchemyEvalRepository:
         await self._session.flush()
 
 
-def _run_dict(row: EvalRunModel) -> dict[str, Any]:
-    return {
-        "id": str(row.id),
-        "task": row.task,
-        "prompt_name": row.prompt_name,
-        "prompt_version": row.prompt_version,
-        "status": row.status,
-        "metrics": row.metrics,
-    }
+def _run_info(row: EvalRunModel) -> EvalRunInfo:
+    return EvalRunInfo(
+        id=row.id,
+        task=row.task,
+        prompt_name=row.prompt_name,
+        prompt_version=row.prompt_version,
+        status=row.status,
+        metrics=dict(row.metrics or {}),
+    )
 
 
 async def _latest_run_for(
     session: AsyncSession, prompt_name: str, prompt_version: int
-) -> dict[str, Any] | None:
+) -> EvalRunInfo | None:
     from sqlalchemy import select
 
     row = (
@@ -118,4 +119,4 @@ async def _latest_run_for(
             .limit(1)
         )
     ).scalar_one_or_none()
-    return _run_dict(row) if row is not None else None
+    return _run_info(row) if row is not None else None
