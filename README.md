@@ -152,6 +152,23 @@ docker compose up -d --build
 
 API 和 worker 都在 compose 里，启动时会自动跑 Alembic 迁移。数据放在 `appdata` volume，配置从 `./config` 只读挂载。
 
+### 本地模型
+
+Ollama 和 vLLM 都提供 OpenAI 兼容端点，可以直接作为 `routing.yaml` 里的 provider：
+
+```bash
+ollama serve
+ollama pull qwen2.5:7b
+```
+
+```dotenv
+LOCAL_LLM_BASE_URL=http://localhost:11434/v1
+LOCAL_LLM_API_KEY=
+LOCAL_LLM_MODEL=qwen2.5:7b
+```
+
+配置后，`generation` 和 `batch` profile 会在云端 provider 失败时降级到本地模型。
+
 ## 配置
 
 常用变量：
@@ -171,6 +188,7 @@ API 和 worker 都在 compose 里，启动时会自动跑 Alembic 迁移。数�
 | `CORS_ORIGINS` | 逗号分隔的允许来源，留空不启用 |
 | `LOG_JSON` | 生产环境可设为 `true`，输出 JSON 日志 |
 | `LOG_LEVEL` | 日志级别，默认 `INFO` |
+| `LOCAL_LLM_BASE_URL` / `LOCAL_LLM_MODEL` | 本地模型 OpenAI 兼容端点，作为 routing 降级 provider |
 | `ASR_BASE_URL` / `ASR_MODEL` | 语音转写实验接口 |
 | `TTS_BASE_URL` / `TTS_MODEL` | 语音合成实验接口 |
 | `IMAGE_BASE_URL` / `IMAGE_MODEL` | 封面生成实验接口 |

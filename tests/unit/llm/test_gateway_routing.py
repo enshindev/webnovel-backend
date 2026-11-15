@@ -11,7 +11,7 @@ import pytest
 from webnovel.kernel.ports.llm import ModelEvent, ModelRequest
 from webnovel.llm.gateway.client import ProviderTarget, RoutedModelClient
 from webnovel.llm.gateway.errors import ErrorClass, GatewayError
-from webnovel.llm.gateway.factory import build_model_client
+from webnovel.llm.gateway.factory import _targets, build_model_client
 from webnovel.llm.gateway.providers.openai_compatible import OpenAICompatibleClient
 from webnovel.llm.gateway.routing import load_routing
 
@@ -232,3 +232,34 @@ async def test_provider_stream_connect_error_becomes_retryable_gateway_error(
 
     assert exc.value.error_class is ErrorClass.UPSTREAM_UNAVAILABLE
     assert exc.value.retryable is True
+
+
+def test_routing_includes_local_provider_when_configured(tmp_path: Path, monkeypatch: Any) -> None:
+    config = tmp_path / "routing.yaml"
+    config.write_text(
+        """
+profiles:
+  generation:
+    providers:
+      - name: default
+        base_url: ${LLM_BASE_URL}
+        model: ${LLM_MODEL}
+      - name: local
+        base_url: ${LOCAL_LLM_BASE_URL}
+        model: ${LOCAL_LLM_MODEL}
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("LOCAL_LLM_BASE_URL", "http://localhost:11434/v1")
+    monkeypatch.setenv("LOCAL_LLM_MODEL", "qwen2.5:7b")
+    settings = SimpleNamespace(
+        routing_config_path=config,
+        llm_base_url="https://cloud/v1",
+        llm_api_key="secret",
+        llm_model="cloud-model",
+    )
+
+    targets = _targets(settings, "generation")  # type: ignore[arg-type]
+
+    assert [target.name for target in targets] == ["default", "local"]
+    assert str(targets[1].client.base_url) == "http://localhost:11434/v1"
