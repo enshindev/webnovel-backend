@@ -67,6 +67,7 @@ from webnovel.modules.memory.retrieval import MemoryVectorService
 from webnovel.modules.memory.service import MemoryServiceImpl
 from webnovel.modules.multimodal.factory import (
     build_multimodal_service,
+    build_speech_provider,
     build_transcription_provider,
 )
 from webnovel.modules.multimodal.service import MultimodalService
@@ -394,6 +395,7 @@ def get_export_service(
         enqueue=queue.enqueue_export,
         audit=audit,
         outbox=outbox,
+        speech=build_speech_provider(settings),
     )
 
 

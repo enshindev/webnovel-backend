@@ -39,6 +39,7 @@ from webnovel.modules.memory.extraction import ExtractionRunner
 from webnovel.modules.memory.repository import SqlAlchemyMemoryRepository
 from webnovel.modules.memory.retrieval import MemoryVectorService
 from webnovel.modules.memory.service import MemoryServiceImpl
+from webnovel.modules.multimodal.factory import build_speech_provider
 from webnovel.modules.outbox.dispatcher import dispatch_once
 from webnovel.modules.quality.repository import SqlAlchemyQualityRepository
 from webnovel.modules.quality.review import QualityReviewRunner
@@ -164,6 +165,7 @@ async def run_export(ctx: object, job_id: str) -> None:
             chapter_service=chapter_service,
             work_service=work_service,
             settings=settings,
+            speech=build_speech_provider(settings),
         )
         await runner.run(UUID(job_id))
 

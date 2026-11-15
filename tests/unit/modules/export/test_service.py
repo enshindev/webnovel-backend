@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from webnovel.kernel.errors import ConflictError
+from webnovel.kernel.errors import ConflictError, UnavailableError
 from webnovel.modules.chapters_versions.contract import Chapter
 from webnovel.modules.export.contract import ExportJob, ExportStatus
 from webnovel.modules.export.service import ExportServiceImpl
@@ -78,3 +78,19 @@ async def test_create_export_requires_gate() -> None:
         assert exc.code == "export.gate_blocked"
     else:
         raise AssertionError("expected ConflictError")
+
+
+async def test_mp3_export_requires_tts() -> None:
+    work_id = uuid4()
+    service = ExportServiceImpl(
+        FakeExportRepository(),
+        chapter_service=FakeChapterService([]),
+        quality_service=FakeQualityService([]),
+        work_service=FakeWorkService(),
+    )
+    try:
+        await service.create(work_id, "mp3")
+    except UnavailableError as exc:
+        assert exc.code == "export.tts_unavailable"
+    else:
+        raise AssertionError("expected UnavailableError")

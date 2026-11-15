@@ -15,7 +15,7 @@ router = APIRouter(tags=["export"])
 
 
 class ExportCreate(BaseModel):
-    format: Literal["txt", "docx"] = "txt"
+    format: Literal["txt", "docx", "mp3"] = "txt"
 
 
 class ExportJobOut(BaseModel):
@@ -63,9 +63,8 @@ async def download_export(
     if not path.is_file():
         raise HTTPException(status_code=410, detail="export file is missing")
     suffix = path.suffix
-    media = (
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        if suffix == ".docx"
-        else "text/plain"
-    )
+    media = {
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".mp3": "audio/mpeg",
+    }.get(suffix, "text/plain")
     return FileResponse(path, filename=f"work-{job.work_id}{suffix}", media_type=media)

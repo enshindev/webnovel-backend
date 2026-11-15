@@ -19,18 +19,20 @@ def build_transcription_provider(settings: Settings) -> OpenAICompatibleASR | No
     )
 
 
+def build_speech_provider(settings: Settings) -> OpenAICompatibleTTS | None:
+    if not settings.tts_base_url or not settings.tts_model:
+        return None
+    return OpenAICompatibleTTS(
+        base_url=settings.tts_base_url,
+        api_key=settings.tts_api_key,
+        model=settings.tts_model,
+        default_voice=settings.tts_voice,
+    )
+
+
 def build_multimodal_service(settings: Settings) -> MultimodalService:
     asr = build_transcription_provider(settings)
-    tts = (
-        OpenAICompatibleTTS(
-            base_url=settings.tts_base_url,
-            api_key=settings.tts_api_key,
-            model=settings.tts_model,
-            default_voice=settings.tts_voice,
-        )
-        if settings.tts_base_url and settings.tts_model
-        else None
-    )
+    tts = build_speech_provider(settings)
     cover = (
         OpenAICompatibleCover(
             base_url=settings.image_base_url,

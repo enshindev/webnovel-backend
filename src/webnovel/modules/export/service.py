@@ -4,12 +4,13 @@ from collections.abc import Awaitable, Callable
 from importlib.util import find_spec
 from uuid import UUID
 
-from webnovel.kernel.errors import ConflictError, NotFoundError, ValidationError
+from webnovel.kernel.errors import ConflictError, NotFoundError, UnavailableError, ValidationError
 from webnovel.modules.audit.contract import AuditRecorder
 from webnovel.modules.chapters_versions.contract import ChapterService
 from webnovel.modules.export.contract import ExportJob, ExportService
 from webnovel.modules.export.gate import evaluate_gate
 from webnovel.modules.export.repository import ExportRepository
+from webnovel.modules.multimodal.contract import SpeechProvider
 from webnovel.modules.outbox.contract import OutboxService
 from webnovel.modules.quality.contract import QualityService
 from webnovel.modules.works.contract import WorkService
@@ -26,6 +27,7 @@ class ExportServiceImpl(ExportService):
         enqueue: Callable[[UUID], Awaitable[None]] | None = None,
         audit: AuditRecorder | None = None,
         outbox: OutboxService | None = None,
+        speech: SpeechProvider | None = None,
     ) -> None:
         self._repository = repository
         self._chapter_service = chapter_service
@@ -34,10 +36,15 @@ class ExportServiceImpl(ExportService):
         self._enqueue = enqueue
         self._audit = audit
         self._outbox = outbox
+        self._speech = speech
 
     async def create(self, work_id: UUID, fmt: str) -> ExportJob:
-        if fmt not in {"txt", "docx"}:
+        if fmt not in {"txt", "docx", "mp3"}:
             raise ValidationError("unsupported export format", code="export.unsupported_format")
+        if fmt == "mp3" and self._speech is None:
+            raise UnavailableError(
+                "mp3 export requires TTS configuration", code="export.tts_unavailable"
+            )
         if fmt == "docx" and find_spec("docx") is None:
             raise ValidationError(
                 "docx export requires the export extra", code="export.docx_unavailable"

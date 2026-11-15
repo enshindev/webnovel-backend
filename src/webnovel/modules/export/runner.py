@@ -7,6 +7,7 @@ from webnovel.modules.chapters_versions.contract import ChapterService
 from webnovel.modules.export.contract import ExportStatus
 from webnovel.modules.export.render import render_docx, render_txt
 from webnovel.modules.export.repository import ExportRepository
+from webnovel.modules.multimodal.contract import SpeechProvider
 from webnovel.modules.works.contract import WorkService
 
 DISCLOSURE = (
@@ -23,11 +24,13 @@ class ExportRunner:
         chapter_service: ChapterService,
         work_service: WorkService,
         settings: Settings,
+        speech: SpeechProvider | None = None,
     ) -> None:
         self._repository = repository
         self._chapter_service = chapter_service
         self._work_service = work_service
         self._settings = settings
+        self._speech = speech
 
     async def run(self, job_id: UUID) -> None:
         job = await self._repository.get(job_id)
@@ -52,7 +55,15 @@ class ExportRunner:
                 disclosure=DISCLOSURE,
             )
             self._settings.export_dir.mkdir(parents=True, exist_ok=True)
-            if job.format == "docx":
+            if job.format == "mp3":
+                if self._speech is None:
+                    raise RuntimeError("TTS is not configured")
+                path = self._settings.export_dir / f"{job.id}.mp3"
+                audio = bytearray()
+                for start in range(0, len(text), 3_000):
+                    audio.extend(await self._speech.synthesize(text[start : start + 3_000]))
+                path.write_bytes(bytes(audio))
+            elif job.format == "docx":
                 path = self._settings.export_dir / f"{job.id}.docx"
                 render_docx(
                     path=str(path),
