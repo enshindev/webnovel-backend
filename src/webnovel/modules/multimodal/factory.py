@@ -9,16 +9,18 @@ from webnovel.modules.multimodal.providers import (
 from webnovel.modules.multimodal.service import MultimodalService
 
 
-def build_multimodal_service(settings: Settings) -> MultimodalService:
-    asr = (
-        OpenAICompatibleASR(
-            base_url=settings.asr_base_url,
-            api_key=settings.asr_api_key,
-            model=settings.asr_model,
-        )
-        if settings.asr_base_url and settings.asr_model
-        else None
+def build_transcription_provider(settings: Settings) -> OpenAICompatibleASR | None:
+    if not settings.asr_base_url or not settings.asr_model:
+        return None
+    return OpenAICompatibleASR(
+        base_url=settings.asr_base_url,
+        api_key=settings.asr_api_key,
+        model=settings.asr_model,
     )
+
+
+def build_multimodal_service(settings: Settings) -> MultimodalService:
+    asr = build_transcription_provider(settings)
     tts = (
         OpenAICompatibleTTS(
             base_url=settings.tts_base_url,

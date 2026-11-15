@@ -7,6 +7,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from webnovel.infra.config import Settings
+from webnovel.kernel.errors import UnavailableError
 from webnovel.modules.library.contract import LibraryCollection, LibraryDocument
 from webnovel.modules.library.service import LibraryServiceImpl
 
@@ -58,3 +59,35 @@ async def test_upload_and_delete_library_document(tmp_path: Path) -> None:
     assert (tmp_path / document.storage_key).is_file()
     await service.delete_document(document.id)
     assert not (tmp_path / document.storage_key).exists()
+
+
+class FakeTranscriber:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str, bytes]] = []
+
+    async def transcribe(self, filename: str, content_type: str, data: bytes) -> str:
+        self.calls.append((filename, content_type, data))
+        return "音频里的文字"
+
+
+async def test_audio_document_uses_asr(tmp_path: Path) -> None:
+    repository = FakeLibraryRepository()
+    transcriber = FakeTranscriber()
+    service = LibraryServiceImpl(
+        repository, Settings(library_dir=tmp_path), transcriber=transcriber
+    )
+    document = await service.add_document(uuid4(), "voice.mp3", b"audio")
+    assert document.kind == "mp3"
+    assert document.status == "parsed"
+    assert transcriber.calls[0][0] == "voice.mp3"
+    assert transcriber.calls[0][2] == b"audio"
+
+
+async def test_audio_document_requires_asr(tmp_path: Path) -> None:
+    service = LibraryServiceImpl(FakeLibraryRepository(), Settings(library_dir=tmp_path))
+    try:
+        await service.add_document(uuid4(), "voice.mp3", b"audio")
+    except UnavailableError as exc:
+        assert exc.code == "library.asr_unavailable"
+    else:
+        raise AssertionError("expected UnavailableError")

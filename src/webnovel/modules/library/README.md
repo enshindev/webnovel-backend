@@ -1,6 +1,6 @@
 # library（S5）
 
-作者私有资料库：上传 PDF/docx/md/txt/图片，解析、OCR、chunk、embedding、检索、引用。
+作者私有资料库：上传 PDF/docx/md/txt/图片/音频（音频需配置 ASR），解析、OCR/转写、chunk、embedding、检索、引用。
 
 - 设计：[docs/backend/LIBRARY.md](../../../../docs/backend/LIBRARY.md)
 - 与 `knowledge/`（创作方法内容）和 `modules/memory`（故事正史）分开。

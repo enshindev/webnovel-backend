@@ -65,7 +65,10 @@ from webnovel.modules.memory.materializer import EntityMaterializerImpl
 from webnovel.modules.memory.repository import SqlAlchemyMemoryRepository
 from webnovel.modules.memory.retrieval import MemoryVectorService
 from webnovel.modules.memory.service import MemoryServiceImpl
-from webnovel.modules.multimodal.factory import build_multimodal_service
+from webnovel.modules.multimodal.factory import (
+    build_multimodal_service,
+    build_transcription_provider,
+)
 from webnovel.modules.multimodal.service import MultimodalService
 from webnovel.modules.outbox.contract import OutboxService
 from webnovel.modules.outbox.repository import SqlAlchemyOutboxRepository
@@ -141,6 +144,7 @@ def get_library_service(session: SessionDep, settings: SettingsDep) -> LibrarySe
         embedding_client,
         usage,
         build_reranker(settings),
+        build_transcription_provider(settings),
     )
 
 

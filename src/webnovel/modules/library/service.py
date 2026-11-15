@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import mimetypes
 import os
 import re
 from pathlib import Path
@@ -8,15 +9,17 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from webnovel.infra.config import Settings
-from webnovel.kernel.errors import NotFoundError, ValidationError
+from webnovel.kernel.errors import NotFoundError, UnavailableError, ValidationError
 from webnovel.kernel.ports.embeddings import EmbeddingClient
 from webnovel.kernel.ports.rerank import Reranker
 from webnovel.llm.retrieval.bm25 import BM25Index
 from webnovel.modules.library.contract import LibraryCollection, LibraryDocument, LibraryService
 from webnovel.modules.library.repository import LibraryRepository
+from webnovel.modules.multimodal.contract import TranscriptionProvider
 from webnovel.modules.usage.contract import UsageService
 
 _OCR_ENGINE: Any | None = None
+_AUDIO_SUFFIXES = {"mp3", "wav", "m4a", "ogg", "webm", "flac"}
 
 
 class LibraryServiceImpl(LibraryService):
@@ -27,12 +30,14 @@ class LibraryServiceImpl(LibraryService):
         embedding_client: EmbeddingClient | None = None,
         usage: UsageService | None = None,
         reranker: Reranker | None = None,
+        transcriber: TranscriptionProvider | None = None,
     ) -> None:
         self._repository = repository
         self._settings = settings
         self._embedding_client = embedding_client
         self._usage = usage
         self._reranker = reranker
+        self._transcriber = transcriber
 
     async def create_collection(
         self, name: str, description: str | None, work_id: UUID | None
@@ -64,7 +69,7 @@ class LibraryServiceImpl(LibraryService):
         if not data:
             raise ValidationError("empty file", code="library.empty_file")
         suffix = Path(filename).suffix.lower().lstrip(".") or "bin"
-        if suffix not in {"txt", "md", "docx", "pdf", "png", "jpg", "jpeg"}:
+        if suffix not in {"txt", "md", "docx", "pdf", "png", "jpg", "jpeg"} | _AUDIO_SUFFIXES:
             raise ValidationError("unsupported file type", code="library.unsupported_type")
         digest = hashlib.sha256(data).hexdigest()
         storage_key = f"{uuid4().hex}.{suffix}"
@@ -80,7 +85,7 @@ class LibraryServiceImpl(LibraryService):
                 content_hash=digest,
                 status="uploaded",
             )
-            text = _parse_text(data, suffix)
+            text = await self._extract_text(filename, suffix, data)
             if text.strip() and self._embedding_client is not None:
                 chunks = _chunk(text)
                 vectors = await self._embedding_client.embed(chunks)
@@ -117,7 +122,7 @@ class LibraryServiceImpl(LibraryService):
         return await self.get_document(document_id)
 
     async def _index_document(self, document: LibraryDocument, data: bytes) -> None:
-        text = _parse_text(data, document.kind)
+        text = await self._extract_text(document.title, document.kind, data)
         if not text.strip():
             await self._repository.set_status(document.id, "uploaded")
             return
@@ -134,6 +139,16 @@ class LibraryServiceImpl(LibraryService):
             ],
         )
         await self._repository.set_status(document.id, "ready")
+
+    async def _extract_text(self, filename: str, suffix: str, data: bytes) -> str:
+        if suffix in _AUDIO_SUFFIXES:
+            if self._transcriber is None:
+                raise UnavailableError(
+                    "audio import requires ASR configuration", code="library.asr_unavailable"
+                )
+            content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+            return await self._transcriber.transcribe(filename, content_type, data)
+        return _parse_text(data, suffix)
 
     async def search(self, query: str, limit: int = 8) -> list[dict[str, object]]:
         if self._embedding_client is None:
