@@ -189,3 +189,20 @@ async def test_timeline_summary_and_foreshadow_tools() -> None:
     assert summary.text == "沈砚在旧巷听见钟声。"
     foreshadows = await tools.execute("list_foreshadows", uuid4(), "{}")
     assert "钟声来自地下" in foreshadows.text
+
+
+class FakeLibrary:
+    async def search(self, query: str, limit: int = 8) -> list[dict[str, object]]:
+        assert query == "旧巷"
+        return [{"document_id": "doc-1", "chunk_index": 0, "text": "旧巷资料"}]
+
+
+async def test_search_library_tool() -> None:
+    tools = AssistantTools(
+        retrieval=None,
+        memory_repository=FakeLookup([]),
+        library=FakeLibrary(),  # type: ignore[arg-type]
+    )
+    execution = await tools.execute("search_library", uuid4(), '{"query": "旧巷"}')
+    assert execution.text == "旧巷资料"
+    assert execution.citations[0]["source"] == "library"

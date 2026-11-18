@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
 
+from webnovel.modules.library.contract import LibraryService
 from webnovel.modules.memory.contract import (
     Entity,
     EntityLookup,
@@ -35,10 +36,12 @@ class AssistantTools:
         retrieval: MemoryRetrievalService | None,
         memory_repository: EntityLookup,
         story_state: MemoryService | None = None,
+        library: LibraryService | None = None,
     ) -> None:
         self._retrieval = retrieval
         self._memory_repository = memory_repository
         self._story_state = story_state
+        self._library = library
 
     async def search_chapters(self, work_id: UUID, query: str, limit: int = 5) -> list[MemoryChunk]:
         if self._retrieval is None:
@@ -113,6 +116,21 @@ class AssistantTools:
                         "type": "object",
                         "properties": {"name": {"type": "string"}},
                         "required": ["name"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_library",
+                    "description": "检索作者资料库",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string"},
+                            "limit": {"type": "integer", "minimum": 1, "maximum": 10},
+                        },
+                        "required": ["query"],
                     },
                 },
             },
@@ -232,6 +250,27 @@ class AssistantTools:
                         "quote": relation.relation_type,
                     }
                     for relation in relations
+                ],
+            )
+        if name == "search_library":
+            if self._library is None:
+                return ToolExecution(text="资料库暂不可用。")
+            query = str(args.get("query", "")).strip()
+            if not query:
+                return ToolExecution(text="请提供检索词。")
+            limit = max(1, min(int(args.get("limit", 5)), 10))
+            hits = await self._library.search(query, limit=limit)
+            if not hits:
+                return ToolExecution(text="资料库没有匹配内容。")
+            return ToolExecution(
+                text="\n\n".join(str(hit.get("text", "")) for hit in hits),
+                citations=[
+                    {
+                        "source": "library",
+                        "ref": f"library:{hit.get('document_id')}:{hit.get('chunk_index')}",
+                        "quote": str(hit.get("text", ""))[:200],
+                    }
+                    for hit in hits
                 ],
             )
         if name == "get_timeline":

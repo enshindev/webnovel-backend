@@ -291,6 +291,14 @@ def get_assistant_service(
         retrieval=retrieval,
         memory_repository=memory_repository,
         story_state=MemoryServiceImpl(memory_repository),
+        library=LibraryServiceImpl(
+            SqlAlchemyLibraryRepository(session),
+            settings,
+            embedding_client,
+            usage,
+            reranker,
+            build_transcription_provider(settings),
+        ),
     )
     knowledge_store = (
         KnowledgeSearchService(embedding_client, SqlAlchemyKnowledgeRepository(session))

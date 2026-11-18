@@ -31,6 +31,8 @@ from webnovel.modules.generation.repository import (
     delete_expired_idempotency_keys,
 )
 from webnovel.modules.generation.runner import GenerationRunner
+from webnovel.modules.library.repository import SqlAlchemyLibraryRepository
+from webnovel.modules.library.service import LibraryServiceImpl
 from webnovel.modules.memory.chapter_embedding_repository import (
     SqlAlchemyChapterEmbeddingRepository,
 )
@@ -39,7 +41,11 @@ from webnovel.modules.memory.extraction import ExtractionRunner
 from webnovel.modules.memory.repository import SqlAlchemyMemoryRepository
 from webnovel.modules.memory.retrieval import MemoryVectorService
 from webnovel.modules.memory.service import MemoryServiceImpl
-from webnovel.modules.multimodal.factory import build_cover_provider, build_speech_provider
+from webnovel.modules.multimodal.factory import (
+    build_cover_provider,
+    build_speech_provider,
+    build_transcription_provider,
+)
 from webnovel.modules.outbox.dispatcher import dispatch_once
 from webnovel.modules.quality.repository import SqlAlchemyQualityRepository
 from webnovel.modules.quality.review import QualityReviewRunner
@@ -219,6 +225,14 @@ async def run_agent(ctx: object, run_id: str) -> None:
             retrieval=retrieval,
             memory_repository=memory_repository,
             story_state=MemoryServiceImpl(memory_repository),
+            library=LibraryServiceImpl(
+                SqlAlchemyLibraryRepository(session),
+                settings,
+                embedding_client,
+                usage,
+                build_reranker(settings),
+                build_transcription_provider(settings),
+            ),
         )
         executor = AgentExecutor(
             repository=SqlAlchemyAgentRepository(session),
