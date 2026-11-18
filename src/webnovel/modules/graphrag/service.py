@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from uuid import UUID
 
 from webnovel.kernel.errors import NotFoundError, ValidationError
@@ -24,18 +23,52 @@ class GraphRagService:
     ) -> GraphSubgraph:
         if depth not in {1, 2}:
             raise ValidationError("depth must be 1 or 2", code="graphrag.invalid_depth")
-        entities = await self._memory.list_entities(work_id)
-        seed = self._resolve_seed(entities, entity_id=entity_id, name=name)
+        if entity_id is None and not (name or "").strip():
+            raise ValidationError("entity_id or name is required", code="graphrag.seed_required")
+
+        seed: Entity | None = None
+        if entity_id is not None:
+            try:
+                seed = await self._memory.get_entity(entity_id)
+            except NotFoundError:
+                seed = None
+        else:
+            candidates = await self._memory.list_entities(work_id, limit=200)
+            seed = self._resolve_seed(candidates, entity_id=None, name=name)
         if seed is None:
             raise NotFoundError("seed entity not found", code="graphrag.seed_not_found")
 
-        by_id = {entity.id: entity for entity in entities}
-        relations = await self._memory.list_relations(work_id)
-        selected_edges = self._walk(seed.id, relations, by_id, depth)
-        node_ids = {seed.id}
-        for edge in selected_edges:
-            node_ids.add(edge.from_entity_id)
-            node_ids.add(edge.to_entity_id)
+        by_id: dict[UUID, Entity] = {seed.id: seed}
+        selected_edges: list[EntityRelation] = []
+        seen_edges: set[UUID] = set()
+        frontier: set[UUID] = {seed.id}
+        for _ in range(depth):
+            relations = await self._memory.list_relations_for_entities(
+                work_id, sorted(frontier, key=str), limit=500
+            )
+            next_frontier: set[UUID] = set()
+            for relation in relations:
+                if relation.id in seen_edges:
+                    continue
+                endpoints = {relation.from_entity_id, relation.to_entity_id}
+                loaded = True
+                for endpoint in endpoints:
+                    if endpoint in by_id:
+                        continue
+                    try:
+                        by_id[endpoint] = await self._memory.get_entity(endpoint)
+                    except NotFoundError:
+                        loaded = False
+                        break
+                if not loaded:
+                    continue
+                selected_edges.append(relation)
+                seen_edges.add(relation.id)
+                next_frontier |= endpoints
+            frontier = next_frontier
+            if not frontier:
+                break
+
         nodes = [
             GraphNode(
                 id=entity.id,
@@ -43,13 +76,13 @@ class GraphRagService:
                 name=entity.name,
                 aliases=list(entity.aliases),
             )
-            for entity_id in sorted(node_ids, key=str)
+            for entity_id in sorted(by_id, key=str)
             if (entity := by_id.get(entity_id)) is not None
         ]
         names = {node.name for node in nodes}
         events = [
             GraphEvent(id=event.id, chapter_number=event.chapter_number, summary=event.summary)
-            for event in await self._memory.list_story_events(work_id)
+            for event in await self._memory.list_story_events(work_id, limit=200)
             if self._event_touches(event, names)
         ][:50]
         return GraphSubgraph(
@@ -89,37 +122,6 @@ class GraphRagService:
         if exact is not None:
             return exact
         return next((entity for entity in entities if wanted in entity.name.casefold()), None)
-
-    @staticmethod
-    def _walk(
-        seed_id: UUID,
-        relations: Sequence[EntityRelation],
-        by_id: dict[UUID, Entity],
-        depth: int,
-    ) -> list[EntityRelation]:
-        selected: list[EntityRelation] = []
-        frontier = {seed_id}
-        seen_edges: set[UUID] = set()
-        for _ in range(depth):
-            next_frontier: set[UUID] = set()
-            for relation in relations:
-                if relation.id in seen_edges:
-                    continue
-                if (
-                    relation.from_entity_id not in frontier
-                    and relation.to_entity_id not in frontier
-                ):
-                    continue
-                if relation.from_entity_id not in by_id or relation.to_entity_id not in by_id:
-                    continue
-                selected.append(relation)
-                seen_edges.add(relation.id)
-                next_frontier.add(relation.from_entity_id)
-                next_frontier.add(relation.to_entity_id)
-            frontier = next_frontier
-            if not frontier:
-                break
-        return selected
 
     @staticmethod
     def _event_touches(event: object, names: set[str]) -> bool:

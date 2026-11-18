@@ -83,8 +83,13 @@ class MemoryServiceImpl(MemoryService):
                 logger.exception("memory.entity_index_failed", proposal_id=str(proposal_id))
         return resolved
 
-    async def list_entities(self, work_id: UUID) -> list[Entity]:
-        return await self._repository.list_entities(work_id)
+    async def list_entities(self, work_id: UUID, limit: int = 500, offset: int = 0) -> list[Entity]:
+        return await self._repository.list_entities(work_id, limit=limit, offset=offset)
+
+    async def list_relations_for_entities(
+        self, work_id: UUID, entity_ids: list[UUID], limit: int = 500
+    ) -> list[EntityRelation]:
+        return await self._repository.list_relations_for_entities(work_id, entity_ids, limit)
 
     async def get_summary(self, chapter_id: UUID) -> Summary:
         summary = await self._repository.get_summary(chapter_id)

@@ -110,7 +110,13 @@ class MemoryRepository(Protocol):
         modified_payload: dict[str, Any] | None = None,
     ) -> ResolvedProposal | None: ...
 
-    async def list_entities(self, work_id: UUID) -> list[Entity]: ...
+    async def list_entities(
+        self, work_id: UUID, limit: int = 500, offset: int = 0
+    ) -> list[Entity]: ...
+
+    async def list_relations_for_entities(
+        self, work_id: UUID, entity_ids: list[UUID], limit: int = 500
+    ) -> list[EntityRelation]: ...
 
     async def get_summary(self, chapter_id: UUID) -> Summary | None: ...
 
@@ -558,14 +564,36 @@ class SqlAlchemyMemoryRepository:
             proposal=_proposal_to_domain(proposal), entity=_entity_to_domain(entity)
         )
 
-    async def list_entities(self, work_id: UUID) -> list[Entity]:
+    async def list_entities(self, work_id: UUID, limit: int = 500, offset: int = 0) -> list[Entity]:
         stmt = (
             select(EntityModel)
             .where(EntityModel.work_id == work_id)
             .order_by(EntityModel.type.asc(), EntityModel.name.asc())
+            .limit(limit)
+            .offset(offset)
         )
         rows = (await self._session.execute(stmt)).scalars().all()
         return [_entity_to_domain(row) for row in rows]
+
+    async def list_relations_for_entities(
+        self, work_id: UUID, entity_ids: list[UUID], limit: int = 500
+    ) -> list[EntityRelation]:
+        if not entity_ids:
+            return []
+        stmt = (
+            select(EntityRelationModel)
+            .where(
+                EntityRelationModel.work_id == work_id,
+                or_(
+                    EntityRelationModel.from_entity_id.in_(entity_ids),
+                    EntityRelationModel.to_entity_id.in_(entity_ids),
+                ),
+            )
+            .order_by(EntityRelationModel.created_at, EntityRelationModel.id)
+            .limit(limit)
+        )
+        models = (await self._session.scalars(stmt)).all()
+        return [_relation_to_domain(model) for model in models]
 
     async def get_summary(self, chapter_id: UUID) -> Summary | None:
         stmt = select(SummaryModel).where(

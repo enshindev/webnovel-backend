@@ -177,7 +177,9 @@ class MemoryIndexer(Protocol):
 
 
 class EntityLookup(Protocol):
-    async def list_entities(self, work_id: UUID) -> list[Entity]: ...
+    async def list_entities(
+        self, work_id: UUID, limit: int = 500, offset: int = 0
+    ) -> list[Entity]: ...
 
 
 class EntityMaterializer(Protocol):
@@ -211,7 +213,13 @@ class MemoryService(Protocol):
         modified_payload: dict[str, Any] | None = None,
     ) -> ResolvedProposal: ...
 
-    async def list_entities(self, work_id: UUID) -> list[Entity]: ...
+    async def list_entities(
+        self, work_id: UUID, limit: int = 500, offset: int = 0
+    ) -> list[Entity]: ...
+
+    async def list_relations_for_entities(
+        self, work_id: UUID, entity_ids: list[UUID], limit: int = 500
+    ) -> list[EntityRelation]: ...
 
     async def get_summary(self, chapter_id: UUID) -> Summary: ...
 

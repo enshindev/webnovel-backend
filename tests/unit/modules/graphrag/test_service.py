@@ -57,18 +57,35 @@ class FakeMemory:
             ),
         ]
 
-    async def list_entities(self, work_id: UUID) -> list[Entity]:
-        return self.entities
+    async def list_entities(self, work_id: UUID, limit: int = 500, offset: int = 0) -> list[Entity]:
+        return self.entities[offset : offset + limit]
 
-    async def list_relations(
-        self, work_id: UUID, entity_id: UUID | None = None
+    async def get_entity(self, entity_id: UUID) -> Entity:
+        for entity in self.entities:
+            if entity.id == entity_id:
+                return entity
+        raise NotFoundError("not found", code="entity.not_found")
+
+    async def list_relations_for_entities(
+        self, work_id: UUID, entity_ids: list[UUID], limit: int = 500
     ) -> list[EntityRelation]:
-        return self.relations
+        ids = set(entity_ids)
+        return [
+            relation
+            for relation in self.relations
+            if relation.from_entity_id in ids or relation.to_entity_id in ids
+        ][:limit]
 
     async def list_story_events(
-        self, work_id: UUID, *, from_chapter: int | None = None, to_chapter: int | None = None
+        self,
+        work_id: UUID,
+        *,
+        from_chapter: int | None = None,
+        to_chapter: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[StoryEvent]:
-        return self.events
+        return self.events[offset : offset + limit]
 
 
 def _entity(name: str, aliases: list[str] | None = None) -> Entity:

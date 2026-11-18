@@ -104,8 +104,8 @@ class FakeLookup:
     def __init__(self, entities: list[Entity] | None = None) -> None:
         self.entities = entities or []
 
-    async def list_entities(self, work_id: UUID) -> list[Entity]:
-        return self.entities
+    async def list_entities(self, work_id: UUID, limit: int = 500, offset: int = 0) -> list[Entity]:
+        return self.entities[offset : offset + limit]
 
 
 def _entity(name: str, entity_id: UUID) -> Entity:
