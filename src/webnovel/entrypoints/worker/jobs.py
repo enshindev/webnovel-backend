@@ -166,6 +166,10 @@ async def run_export(ctx: object, job_id: str) -> None:
     async with session_factory() as session, session.begin():
         work_service = WorksService(SqlAlchemyWorkRepository(session))
         chapter_service = ChaptersService(SqlAlchemyChapterRepository(session), work_service)
+        usage = UsageServiceImpl(
+            SqlAlchemyUsageRepository(session),
+            load_pricing(settings.pricing_config_path),
+        )
         runner = ExportRunner(
             repository=SqlAlchemyExportRepository(session),
             chapter_service=chapter_service,
@@ -173,6 +177,7 @@ async def run_export(ctx: object, job_id: str) -> None:
             settings=settings,
             speech=build_speech_provider(settings),
             cover=build_cover_provider(settings),
+            usage=usage,
         )
         await runner.run(UUID(job_id))
 

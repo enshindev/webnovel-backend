@@ -9,6 +9,7 @@ from webnovel.modules.export.contract import ExportStatus
 from webnovel.modules.export.render import render_docx, render_txt
 from webnovel.modules.export.repository import ExportRepository
 from webnovel.modules.multimodal.contract import CoverProvider, SpeechProvider
+from webnovel.modules.usage.contract import UsageService
 from webnovel.modules.works.contract import WorkService
 
 DISCLOSURE = (
@@ -27,6 +28,7 @@ class ExportRunner:
         settings: Settings,
         speech: SpeechProvider | None = None,
         cover: CoverProvider | None = None,
+        usage: UsageService | None = None,
     ) -> None:
         self._repository = repository
         self._chapter_service = chapter_service
@@ -34,6 +36,7 @@ class ExportRunner:
         self._settings = settings
         self._speech = speech
         self._cover = cover
+        self._usage = usage
 
     async def run(self, job_id: UUID) -> None:
         job = await self._repository.get(job_id)
@@ -66,6 +69,17 @@ class ExportRunner:
                 for start in range(0, len(text), 3_000):
                     audio.extend(await self._speech.synthesize(text[start : start + 3_000]))
                 path.write_bytes(bytes(audio))
+                if self._usage is not None:
+                    await self._usage.record_llm(
+                        work_id=job.work_id,
+                        generation_id=None,
+                        provider="multimodal",
+                        model=str(getattr(self._speech, "model", "multimodal") or "multimodal"),
+                        task_type="tts",
+                        prompt_tokens=max(1, len(text) // 4),
+                        completion_tokens=max(1, len(audio) // 1024),
+                        estimated=True,
+                    )
             elif job.format == "cover":
                 if self._cover is None:
                     raise UnavailableError(
@@ -78,6 +92,17 @@ class ExportRunner:
                 image = await self._cover.generate(prompt, "1024x1536")
                 path = self._settings.export_dir / f"{job.id}.png"
                 path.write_bytes(image)
+                if self._usage is not None:
+                    await self._usage.record_llm(
+                        work_id=job.work_id,
+                        generation_id=None,
+                        provider="multimodal",
+                        model=str(getattr(self._cover, "model", "multimodal") or "multimodal"),
+                        task_type="cover",
+                        prompt_tokens=max(1, len(prompt) // 4),
+                        completion_tokens=max(1, len(image) // 1024),
+                        estimated=True,
+                    )
             elif job.format == "docx":
                 path = self._settings.export_dir / f"{job.id}.docx"
                 render_docx(

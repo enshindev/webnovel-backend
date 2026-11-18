@@ -257,8 +257,11 @@ def get_memory_service(session: SessionDep, settings: SettingsDep) -> MemoryServ
     return MemoryServiceImpl(SqlAlchemyMemoryRepository(session), queue.enqueue_extraction, indexer)
 
 
-def get_multimodal_service(settings: SettingsDep) -> MultimodalService:
-    return build_multimodal_service(settings)
+def get_multimodal_service(session: SessionDep, settings: SettingsDep) -> MultimodalService:
+    usage = UsageServiceImpl(
+        SqlAlchemyUsageRepository(session), load_pricing(settings.pricing_config_path)
+    )
+    return build_multimodal_service(settings, usage)
 
 
 def get_graphrag_service(

@@ -33,3 +33,27 @@ profiles:
     providers: []
   moderation:
     providers: []
+  asr:
+    providers:
+      - name: default
+        base_url: ${ASR_BASE_URL}
+        api_key: ${ASR_API_KEY}
+        model: ${ASR_MODEL}
+        timeout_seconds: 120
+        max_retries: 1
+  tts:
+    providers:
+      - name: default
+        base_url: ${TTS_BASE_URL}
+        api_key: ${TTS_API_KEY}
+        model: ${TTS_MODEL}
+        timeout_seconds: 180
+        max_retries: 1
+  image:
+    providers:
+      - name: default
+        base_url: ${IMAGE_BASE_URL}
+        api_key: ${IMAGE_API_KEY}
+        model: ${IMAGE_MODEL}
+        timeout_seconds: 180
+        max_retries: 1

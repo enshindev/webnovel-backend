@@ -147,7 +147,19 @@ class LibraryServiceImpl(LibraryService):
                     "audio import requires ASR configuration", code="library.asr_unavailable"
                 )
             content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
-            return await self._transcriber.transcribe(filename, content_type, data)
+            text = await self._transcriber.transcribe(filename, content_type, data)
+            if self._usage is not None:
+                await self._usage.record_llm(
+                    work_id=None,
+                    generation_id=None,
+                    provider="multimodal",
+                    model=str(getattr(self._transcriber, "model", "multimodal") or "multimodal"),
+                    task_type="asr",
+                    prompt_tokens=max(1, len(data) // 4),
+                    completion_tokens=max(1, len(text) // 4),
+                    estimated=True,
+                )
+            return text
         return _parse_text(data, suffix)
 
     async def search(self, query: str, limit: int = 8) -> list[dict[str, object]]:

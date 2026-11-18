@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from webnovel.kernel.errors import UnavailableError
 from webnovel.modules.multimodal.contract import (
     CoverProvider,
     SpeechProvider,
     TranscriptionProvider,
 )
+from webnovel.modules.usage.contract import UsageService
 
 
 class MultimodalService:
@@ -15,10 +18,12 @@ class MultimodalService:
         asr: TranscriptionProvider | None = None,
         tts: SpeechProvider | None = None,
         cover: CoverProvider | None = None,
+        usage: UsageService | None = None,
     ) -> None:
         self._asr = asr
         self._tts = tts
         self._cover = cover
+        self._usage = usage
 
     def status(self) -> dict[str, bool]:
         return {
@@ -27,19 +32,52 @@ class MultimodalService:
             "cover": self._cover is not None,
         }
 
-    async def transcribe(self, filename: str, content_type: str, data: bytes) -> str:
+    async def transcribe(
+        self, filename: str, content_type: str, data: bytes, *, work_id: UUID | None = None
+    ) -> str:
         if self._asr is None:
             raise UnavailableError("ASR is not configured", code="multimodal.asr_unavailable")
-        return await self._asr.transcribe(filename, content_type, data)
+        text = await self._asr.transcribe(filename, content_type, data)
+        await self._record("asr", work_id, len(data), len(text), self._asr)
+        return text
 
-    async def synthesize(self, text: str, voice: str | None = None) -> bytes:
+    async def synthesize(
+        self, text: str, voice: str | None = None, *, work_id: UUID | None = None
+    ) -> bytes:
         if self._tts is None:
             raise UnavailableError("TTS is not configured", code="multimodal.tts_unavailable")
-        return await self._tts.synthesize(text, voice)
+        audio = await self._tts.synthesize(text, voice)
+        await self._record("tts", work_id, len(text), len(audio) // 1024, self._tts)
+        return audio
 
-    async def cover(self, prompt: str, size: str = "1024x1024") -> bytes:
+    async def cover(
+        self, prompt: str, size: str = "1024x1024", *, work_id: UUID | None = None
+    ) -> bytes:
         if self._cover is None:
             raise UnavailableError(
                 "image provider is not configured", code="multimodal.cover_unavailable"
             )
-        return await self._cover.generate(prompt, size)
+        image = await self._cover.generate(prompt, size)
+        await self._record("cover", work_id, len(prompt), len(image) // 1024, self._cover)
+        return image
+
+    async def _record(
+        self,
+        task: str,
+        work_id: UUID | None,
+        prompt_units: int,
+        output_units: int,
+        provider: object,
+    ) -> None:
+        if self._usage is None:
+            return
+        await self._usage.record_llm(
+            work_id=work_id,
+            generation_id=None,
+            provider="multimodal",
+            model=str(getattr(provider, "model", "multimodal") or "multimodal"),
+            task_type=task,
+            prompt_tokens=max(1, prompt_units // 4),
+            completion_tokens=max(1, output_units // 4),
+            estimated=True,
+        )
