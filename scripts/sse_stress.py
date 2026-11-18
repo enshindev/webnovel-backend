@@ -107,7 +107,7 @@ async def main() -> None:
             stdout=worker_log.open("w"),
             stderr=subprocess.STDOUT,
         )
-        async with httpx.AsyncClient(base_url=f"http://127.0.0.1:{port}", timeout=120) as client:
+        async with httpx.AsyncClient(base_url=f"http://127.0.0.1:{port}", timeout=300) as client:
             await wait_health(client)
 
             def payload(response: httpx.Response, action: str) -> dict[str, object]:
