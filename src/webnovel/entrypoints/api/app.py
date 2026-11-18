@@ -21,10 +21,8 @@ from webnovel.modules.audit.http import router as audit_router
 from webnovel.modules.chapters_versions.http import router as chapters_router
 from webnovel.modules.export.http import router as export_router
 from webnovel.modules.generation.http import router as generation_router
-from webnovel.modules.graphrag.http import router as graphrag_router
 from webnovel.modules.library.http import router as library_router
 from webnovel.modules.memory.http import router as memory_router
-from webnovel.modules.multimodal.http import router as multimodal_router
 from webnovel.modules.prompts.http import router as prompts_router
 from webnovel.modules.quality.http import router as quality_router
 from webnovel.modules.settings.http import router as settings_router
@@ -96,11 +94,17 @@ def create_app() -> FastAPI:
     app.include_router(settings_router, prefix=API_PREFIX)
     app.include_router(style_router, prefix=API_PREFIX)
     app.include_router(memory_router, prefix=API_PREFIX)
-    app.include_router(multimodal_router, prefix=API_PREFIX)
+    if settings.enable_experiments:
+        from webnovel.modules.multimodal.http import router as multimodal_router
+
+        app.include_router(multimodal_router, prefix=API_PREFIX)
     app.include_router(prompts_router, prefix=API_PREFIX)
     app.include_router(quality_router, prefix=API_PREFIX)
     app.include_router(export_router, prefix=API_PREFIX)
-    app.include_router(graphrag_router, prefix=API_PREFIX)
+    if settings.enable_experiments:
+        from webnovel.modules.graphrag.http import router as graphrag_router
+
+        app.include_router(graphrag_router, prefix=API_PREFIX)
     app.include_router(library_router, prefix=API_PREFIX)
     app.include_router(usage_router, prefix=API_PREFIX)
     app.include_router(volumes_router, prefix=API_PREFIX)
