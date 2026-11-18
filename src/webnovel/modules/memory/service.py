@@ -42,9 +42,13 @@ class MemoryServiceImpl(MemoryService):
         self._indexer = indexer
 
     async def start_extraction(
-        self, work_id: UUID, chapter_id: UUID, version_id: UUID
+        self,
+        work_id: UUID,
+        chapter_id: UUID,
+        version_id: UUID,
+        trigger: str = "accept",
     ) -> ExtractionRun:
-        run = await self._repository.create_run(work_id, chapter_id, version_id, trigger="accept")
+        run = await self._repository.create_run(work_id, chapter_id, version_id, trigger=trigger)
         if self._enqueue is not None:
             await self._enqueue(run.id)
         return run
@@ -162,6 +166,22 @@ class MemoryServiceImpl(MemoryService):
             limit=limit,
             offset=offset,
         )
+
+    async def update_entity_change_status(
+        self, work_id: UUID, change_id: UUID, status: str
+    ) -> EntityStateChange:
+        if status not in {"confirmed", "corrected", "dismissed"}:
+            raise ValidationError(
+                f"invalid entity change status: {status}",
+                code="story_state.invalid_change_status",
+            )
+        change = await self._repository.update_entity_change_status(work_id, change_id, status)
+        if change is None:
+            raise NotFoundError(
+                f"entity state change not found: {change_id}",
+                code="story_state.change_not_found",
+            )
+        return change
 
     async def list_timeline(self, work_id: UUID) -> list[TimelineEvent]:
         return await self._repository.list_timeline(work_id)

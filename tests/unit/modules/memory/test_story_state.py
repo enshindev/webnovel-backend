@@ -3,7 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 
-from webnovel.modules.memory.contract import KnowledgeState, StoryEvent
+from webnovel.modules.memory.contract import EntityStateChange, KnowledgeState, StoryEvent
 from webnovel.modules.memory.extraction import ExtractionRunner
 from webnovel.modules.memory.service import MemoryServiceImpl
 from webnovel.modules.memory.story_state import detect_contradictions
@@ -182,3 +182,26 @@ async def test_event_payload_normalizes_entity_changes() -> None:
             "after": {"value": "师姐"},
         }
     ]
+
+
+class FakeChangeRepository:
+    async def update_entity_change_status(
+        self, work_id: UUID, change_id: UUID, status: str
+    ) -> EntityStateChange | None:
+        return EntityStateChange(
+            id=change_id,
+            work_id=work_id,
+            entity_id=None,
+            entity_name="玉佩",
+            field="holder",
+            before={"value": "沈砚"},
+            after={"value": "师姐"},
+            chapter_number=3,
+            status=status,
+        )
+
+
+async def test_entity_change_status_can_be_corrected() -> None:
+    service = MemoryServiceImpl(FakeChangeRepository())  # type: ignore[arg-type]
+    change = await service.update_entity_change_status(uuid4(), uuid4(), "corrected")
+    assert change.status == "corrected"

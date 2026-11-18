@@ -195,7 +195,7 @@ class MemoryRetrievalService(Protocol):
 
 class MemoryService(Protocol):
     async def start_extraction(
-        self, work_id: UUID, chapter_id: UUID, version_id: UUID
+        self, work_id: UUID, chapter_id: UUID, version_id: UUID, trigger: str = "accept"
     ) -> ExtractionRun: ...
 
     async def list_proposals(
@@ -267,6 +267,10 @@ class MemoryService(Protocol):
         limit: int = 100,
         offset: int = 0,
     ) -> list[EntityStateChange]: ...
+
+    async def update_entity_change_status(
+        self, work_id: UUID, change_id: UUID, status: str
+    ) -> EntityStateChange: ...
 
     async def create_foreshadow(
         self,

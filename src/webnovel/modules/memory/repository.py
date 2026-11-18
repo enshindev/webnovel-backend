@@ -174,6 +174,10 @@ class MemoryRepository(Protocol):
         offset: int = 0,
     ) -> list[EntityStateChange]: ...
 
+    async def update_entity_change_status(
+        self, work_id: UUID, change_id: UUID, status: str
+    ) -> EntityStateChange | None: ...
+
     async def add_foreshadow(
         self,
         work_id: UUID,
@@ -820,6 +824,16 @@ class SqlAlchemyMemoryRepository:
         )
         models = (await self._session.scalars(stmt)).all()
         return [_entity_change_to_domain(model) for model in models]
+
+    async def update_entity_change_status(
+        self, work_id: UUID, change_id: UUID, status: str
+    ) -> EntityStateChange | None:
+        model = await self._session.get(EntityStateChangeModel, change_id)
+        if model is None or model.work_id != work_id:
+            return None
+        model.status = status
+        await self._session.flush()
+        return _entity_change_to_domain(model)
 
     async def get_entity(self, entity_id: UUID) -> Entity | None:
         model = await self._session.get(EntityModel, entity_id)

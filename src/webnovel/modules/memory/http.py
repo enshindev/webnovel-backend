@@ -4,10 +4,10 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from webnovel.entrypoints.api.deps import MemoryServiceDep
+from webnovel.entrypoints.api.deps import ChapterServiceDep, MemoryServiceDep
 from webnovel.modules.memory.contract import ProposalStatus
 
 router = APIRouter(tags=["memory"])
@@ -173,6 +173,15 @@ class EntityStateChangeList(BaseModel):
     items: list[EntityStateChangeOut]
 
 
+class EntityStateChangeStatus(BaseModel):
+    status: Literal["confirmed", "corrected", "dismissed"]
+
+
+class RebuildResult(BaseModel):
+    queued: int
+    run_ids: list[UUID]
+
+
 class ForeshadowCreate(BaseModel):
     description: str = Field(min_length=1, max_length=4_000)
     planted_chapter_id: UUID | None = None
@@ -333,6 +342,41 @@ async def list_entity_changes(
     return EntityStateChangeList(
         items=[EntityStateChangeOut.model_validate(change) for change in changes]
     )
+
+
+@router.patch(
+    "/works/{work_id}/story-state/entity-changes/{change_id}",
+    response_model=EntityStateChangeOut,
+)
+async def update_entity_change(
+    work_id: UUID,
+    change_id: UUID,
+    body: EntityStateChangeStatus,
+    service: MemoryServiceDep,
+) -> EntityStateChangeOut:
+    change = await service.update_entity_change_status(work_id, change_id, body.status)
+    return EntityStateChangeOut.model_validate(change)
+
+
+@router.post(
+    "/works/{work_id}/story-state/rebuild",
+    response_model=RebuildResult,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def rebuild_story_state(
+    work_id: UUID,
+    service: MemoryServiceDep,
+    chapters: ChapterServiceDep,
+) -> RebuildResult:
+    runs = []
+    for chapter in await chapters.list(work_id):
+        if chapter.current_version_id is None:
+            continue
+        run = await service.start_extraction(
+            work_id, chapter.id, chapter.current_version_id, trigger="rebuild"
+        )
+        runs.append(run.id)
+    return RebuildResult(queued=len(runs), run_ids=runs)
 
 
 @router.get("/works/{work_id}/story-state/relations", response_model=EntityRelationList)
