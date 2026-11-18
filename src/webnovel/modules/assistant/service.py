@@ -17,6 +17,7 @@ from webnovel.modules.assistant.contract import (
 )
 from webnovel.modules.assistant.repository import AssistantRepository
 from webnovel.modules.audit.contract import AuditRecorder
+from webnovel.modules.generation.contract import PreferenceRecorder
 from webnovel.modules.memory.contract import EntityMaterializer
 from webnovel.modules.outbox.contract import OutboxService
 from webnovel.modules.works.contract import WorkService
@@ -37,6 +38,7 @@ class AssistantServiceImpl(AssistantService):
         chat: AssistantChatRunner | None = None,
         audit: AuditRecorder | None = None,
         outbox: OutboxService | None = None,
+        preference: PreferenceRecorder | None = None,
     ) -> None:
         self._repository = repository
         self._work_service = work_service
@@ -44,6 +46,7 @@ class AssistantServiceImpl(AssistantService):
         self._chat = chat
         self._audit = audit
         self._outbox = outbox
+        self._preference = preference
 
     async def create_conversation(
         self, scope: str, mode: str, title: str | None, work_id: UUID | None
@@ -112,7 +115,7 @@ class AssistantServiceImpl(AssistantService):
         conversation = await self.get_conversation(conversation_id)
         if not content.strip():
             raise ValidationError("idea content required", code="assistant.idea_empty")
-        return await self._repository.add_idea(
+        idea = await self._repository.add_idea(
             conversation_id,
             conversation.scope,
             conversation.work_id,
@@ -120,6 +123,14 @@ class AssistantServiceImpl(AssistantService):
             content,
             tags or [],
         )
+        if self._preference is not None:
+            try:
+                await self._preference.saved_idea(idea.id, conversation.scope)
+            except Exception:
+                import logging
+
+                logging.getLogger(__name__).exception("assistant.saved_idea_event_failed")
+        return idea
 
     async def list_ideas(self, conversation_id: UUID) -> list[Idea]:
         await self.get_conversation(conversation_id)

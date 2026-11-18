@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from uuid import UUID
 
 from webnovel.kernel.errors import NotFoundError, ValidationError
@@ -25,10 +25,12 @@ class ChaptersService:
         repository: ChapterRepository,
         work_service: WorkService,
         volume_service: VolumeService | None = None,
+        on_saved: Callable[[UUID, str], Awaitable[None]] | None = None,
     ) -> None:
         self._repository = repository
         self._work_service = work_service
         self._volume_service = volume_service
+        self._on_saved = on_saved
 
     async def create(self, work_id: UUID, number: int, title: str, content: str = "") -> Chapter:
         if number <= 0:
@@ -69,6 +71,13 @@ class ChaptersService:
         )
         if chapter is None:
             raise NotFoundError(f"chapter not found: {chapter_id}", code="chapter.not_found")
+        if self._on_saved is not None:
+            try:
+                await self._on_saved(chapter_id, content)
+            except Exception:
+                import logging
+
+                logging.getLogger(__name__).exception("chapter.save_observer_failed")
         return chapter
 
     async def assign_volume(self, chapter_id: UUID, volume_id: UUID | None) -> Chapter:

@@ -50,6 +50,7 @@ from webnovel.modules.export.contract import ExportService
 from webnovel.modules.export.repository import SqlAlchemyExportRepository
 from webnovel.modules.export.service import ExportServiceImpl
 from webnovel.modules.generation.contract import GenerationService
+from webnovel.modules.generation.preference import SqlAlchemyPreferenceRecorder
 from webnovel.modules.generation.repository import SqlAlchemyGenerationRepository
 from webnovel.modules.generation.service import GenerationsService
 from webnovel.modules.graphrag.service import GraphRagService
@@ -221,7 +222,13 @@ def get_chapter_service(
     session: SessionDep, work_service: Annotated[WorkService, Depends(get_work_service)]
 ) -> ChapterService:
     volume_service = VolumeServiceImpl(SqlAlchemyVolumeRepository(session), work_service)
-    return ChaptersService(SqlAlchemyChapterRepository(session), work_service, volume_service)
+    preference = SqlAlchemyPreferenceRecorder(session)
+    return ChaptersService(
+        SqlAlchemyChapterRepository(session),
+        work_service,
+        volume_service,
+        on_saved=preference.edited_after_accept,
+    )
 
 
 def get_settings_service(session: SessionDep) -> SettingsService:
@@ -325,6 +332,7 @@ def get_assistant_service(
         chat,
         audit,
         outbox,
+        SqlAlchemyPreferenceRecorder(session),
     )
 
 

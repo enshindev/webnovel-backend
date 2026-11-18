@@ -69,8 +69,8 @@ class PreferenceEventModel(Base):
     __tablename__ = "preference_events"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    candidate_set_id: Mapped[UUID] = mapped_column(
-        ForeignKey("candidate_sets.id", ondelete="CASCADE")
+    candidate_set_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("candidate_sets.id", ondelete="CASCADE"), nullable=True
     )
     candidate_id: Mapped[str] = mapped_column(String(64))
     event_type: Mapped[str] = mapped_column(String(32))

@@ -11,6 +11,12 @@ from webnovel.modules.chapters_versions.contract import ChapterVersion
 MAX_CANDIDATE_COUNT = 4
 
 
+class PreferenceRecorder(Protocol):
+    async def edited_after_accept(self, chapter_id: UUID, content: str) -> None: ...
+
+    async def saved_idea(self, idea_id: UUID, scope: str) -> None: ...
+
+
 class TaskType(StrEnum):
     CONTINUE = "continue"
     REWRITE = "rewrite"
