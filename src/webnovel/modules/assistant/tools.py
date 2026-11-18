@@ -116,6 +116,37 @@ class AssistantTools:
                     },
                 },
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_timeline",
+                    "description": "查作品时间线事件",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"limit": {"type": "integer", "minimum": 1, "maximum": 50}},
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_summary",
+                    "description": "按章节 ID 查章节摘要",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"chapter_id": {"type": "string"}},
+                        "required": ["chapter_id"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "list_foreshadows",
+                    "description": "列出作品的伏笔",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            },
         ]
 
     async def execute(self, name: str, work_id: UUID, arguments: str) -> ToolExecution:
@@ -201,6 +232,61 @@ class AssistantTools:
                         "quote": relation.relation_type,
                     }
                     for relation in relations
+                ],
+            )
+        if name == "get_timeline":
+            if self._story_state is None:
+                return ToolExecution(text="故事状态暂不可用。")
+            limit = max(1, min(int(args.get("limit", 20)), 50))
+            timeline = (await self._story_state.list_timeline(work_id))[:limit]
+            if not timeline:
+                return ToolExecution(text="没有时间线事件。")
+            return ToolExecution(
+                text="\n".join(
+                    f"{event.event_time or '未知时间'}：{event.description}" for event in timeline
+                ),
+                citations=[
+                    {
+                        "source": "timeline",
+                        "ref": f"timeline:{event.id}",
+                        "quote": event.description[:200],
+                    }
+                    for event in timeline
+                ],
+            )
+        if name == "get_summary":
+            if self._story_state is None:
+                return ToolExecution(text="故事状态暂不可用。")
+            chapter_id = str(args.get("chapter_id", "")).strip()
+            try:
+                summary = await self._story_state.get_summary(UUID(chapter_id))
+            except Exception as exc:
+                return ToolExecution(text=f"没有找到摘要：{exc}")
+            return ToolExecution(
+                text=summary.content,
+                citations=[
+                    {
+                        "source": "summary",
+                        "ref": f"summary:{summary.id}",
+                        "quote": summary.content[:200],
+                    }
+                ],
+            )
+        if name == "list_foreshadows":
+            if self._story_state is None:
+                return ToolExecution(text="故事状态暂不可用。")
+            items = await self._story_state.list_foreshadows(work_id)
+            if not items:
+                return ToolExecution(text="没有记录伏笔。")
+            return ToolExecution(
+                text="\n".join(f"{item.status}：{item.description}" for item in items),
+                citations=[
+                    {
+                        "source": "foreshadow",
+                        "ref": f"foreshadow:{item.id}",
+                        "quote": item.description[:200],
+                    }
+                    for item in items
                 ],
             )
         if name == "get_story_events":

@@ -71,7 +71,7 @@ class AssistantChatRunner:
         tools = self._tools.schemas() if self._tools is not None else None
         messages: list[ChatMessage] = [ChatMessage(role="user", content=rendered)]
         usage = None
-        for _ in range(2):
+        for _ in range(self._settings.assistant_max_tool_rounds):
             response = await complete_response(
                 ModelRequest(
                     model=self._settings.llm_model,
@@ -106,7 +106,7 @@ class AssistantChatRunner:
             try:
                 execution = await asyncio.wait_for(
                     self._tools.execute(call.name, conversation.work_id, call.arguments),
-                    timeout=8,
+                    timeout=self._settings.assistant_tool_timeout_seconds,
                 )
                 citations.extend(execution.citations)
                 messages.append(
@@ -133,7 +133,7 @@ class AssistantChatRunner:
         usage = None
         reply = ""
         try:
-            for round_no in range(2):
+            for _ in range(self._settings.assistant_max_tool_rounds):
                 parts: list[str] = []
                 tool_calls: list[Any] = []
                 async for event in self._model_client.stream(
@@ -141,7 +141,7 @@ class AssistantChatRunner:
                         model=self._settings.llm_model,
                         messages=messages,
                         max_tokens=1_500,
-                        tools=tools if round_no == 0 else None,
+                        tools=tools,
                     )
                 ):
                     if event.type == "delta" and event.text:

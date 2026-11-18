@@ -6,8 +6,11 @@ from webnovel.modules.assistant.tools import AssistantTools
 from webnovel.modules.memory.contract import (
     Entity,
     EntityRelation,
+    Foreshadow,
     KnowledgeState,
     StoryEvent,
+    Summary,
+    TimelineEvent,
 )
 
 
@@ -37,6 +40,40 @@ class FakeMemory:
         self, work_id: UUID, entity_id: UUID | None = None
     ) -> list[EntityRelation]:
         return self.relations
+
+    async def list_timeline(self, work_id: UUID) -> list[TimelineEvent]:
+        return [
+            TimelineEvent(
+                id=uuid4(),
+                work_id=work_id,
+                chapter_id=None,
+                event_time="雨夜",
+                description="沈砚进入旧巷",
+                entity_ids=[],
+            )
+        ]
+
+    async def get_summary(self, chapter_id: UUID) -> Summary:
+        return Summary(
+            id=uuid4(),
+            work_id=uuid4(),
+            chapter_id=chapter_id,
+            content="沈砚在旧巷听见钟声。",
+            based_on_version_id=uuid4(),
+            status="fresh",
+        )
+
+    async def list_foreshadows(self, work_id: UUID) -> list[Foreshadow]:
+        return [
+            Foreshadow(
+                id=uuid4(),
+                work_id=work_id,
+                description="钟声来自地下",
+                planted_chapter_id=None,
+                expected_recover_chapter_id=None,
+                status="planted",
+            )
+        ]
 
     async def list_story_events(
         self,
@@ -104,7 +141,14 @@ def _tools() -> AssistantTools:
 
 def test_tool_schemas_include_story_state_tools() -> None:
     names = {schema["function"]["name"] for schema in AssistantTools.schemas()}  # type: ignore[index]
-    assert {"who_knows", "get_story_events", "get_relations"} <= names
+    assert {
+        "who_knows",
+        "get_story_events",
+        "get_relations",
+        "get_timeline",
+        "get_summary",
+        "list_foreshadows",
+    } <= names
 
 
 async def test_who_knows_tool_returns_citations() -> None:
@@ -134,3 +178,14 @@ async def test_get_relations_tool_formats_edges() -> None:
     result = await _tools().execute("get_relations", uuid4(), '{"name": "沈砚"}')
     assert "沈砚 -> 师姐（同门）" in result.text
     assert result.citations[0]["source"] == "entity_relation"
+
+
+async def test_timeline_summary_and_foreshadow_tools() -> None:
+    tools = _tools()
+    timeline = await tools.execute("get_timeline", uuid4(), "{}")
+    assert "沈砚进入旧巷" in timeline.text
+    chapter_id = uuid4()
+    summary = await tools.execute("get_summary", uuid4(), f'{{"chapter_id": "{chapter_id}"}}')
+    assert summary.text == "沈砚在旧巷听见钟声。"
+    foreshadows = await tools.execute("list_foreshadows", uuid4(), "{}")
+    assert "钟声来自地下" in foreshadows.text

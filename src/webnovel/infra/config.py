@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     daily_budget: float | None = None
     assistant_enabled: bool = True
     story_state_contradictions_in_quality: bool = False
+    assistant_max_tool_rounds: int = 20
+    assistant_tool_timeout_seconds: float = 30.0
     api_token: str = ""
     rate_limit_per_minute: int = 0
     cors_origins: str = ""
