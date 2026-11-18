@@ -39,6 +39,12 @@ class EvalService:
         passed_ids = {str(result["case_id"]) for result in results if result.get("passed")}
         passed = len(passed_ids)
         must_pass_passed = len(must_pass_ids & passed_ids)
+        latencies = [
+            float(result["details"]["latency_ms"])
+            for result in results
+            if isinstance(result.get("details"), dict)
+            and isinstance(result["details"].get("latency_ms"), (int, float))
+        ]
         metrics = {
             "total": len(results),
             "passed": passed,
@@ -46,6 +52,7 @@ class EvalService:
             "must_pass_total": len(must_pass_ids),
             "must_pass_passed": must_pass_passed,
             "gate": "passed" if must_pass_passed == len(must_pass_ids) else "failed",
+            "avg_latency_ms": round(sum(latencies) / len(latencies), 2) if latencies else None,
         }
         await self._repository.finish_run(
             run_id, status="succeeded", metrics=metrics, results=results

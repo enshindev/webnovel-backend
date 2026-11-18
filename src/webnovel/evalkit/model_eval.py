@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+import time
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -27,6 +28,7 @@ async def run_cases(
     includes: Mapping[str, PromptSpec],
     limit: int | None = None,
     progress: Callable[[int, int, str], None] | None = None,
+    judge: Callable[[Any, str], Awaitable[dict[str, Any]]] | None = None,
 ) -> list[ModelEvalResult]:
     selected = list(cases[:limit] if limit is not None else cases)
     results: list[ModelEvalResult] = []
@@ -35,6 +37,7 @@ async def run_cases(
             progress(index, len(selected), case.spec.id)
         values = _values(case, prompt)
         output = ""
+        started = time.monotonic()
         try:
             rendered = render_prompt(prompt, values, includes)
             output = await client.complete(
@@ -45,7 +48,12 @@ async def run_cases(
                     max_tokens=int(prompt.defaults.get("max_tokens", 1200)),
                 )
             )
-            result = judge_output(case.spec, output)
+            result = (
+                await judge(case.spec, output)
+                if judge is not None
+                else judge_output(case.spec, output)
+            )
+            result["details"]["latency_ms"] = round((time.monotonic() - started) * 1000)
         except Exception as exc:
             result = {
                 "case_id": case.spec.id,

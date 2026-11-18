@@ -37,6 +37,7 @@ def eval_suite(
     run_model: bool = typer.Option(False, "--run/--no-run", help="直接调用模型生成输出"),
     limit: int | None = None,
     save_outputs: Path | None = None,
+    llm_judge: bool = typer.Option(False, "--llm-judge", help="用 LLM 按 rubric 评分"),
 ) -> None:
     """跑本地评测集并写入 eval_runs。"""
     import asyncio
@@ -61,6 +62,9 @@ def eval_suite(
         raise typer.Exit(code=2)
     if save_outputs is not None and not run_model:
         typer.echo("--save-outputs is only valid with --run", err=True)
+        raise typer.Exit(code=2)
+    if llm_judge and not run_model:
+        typer.echo("--llm-judge is only valid with --run", err=True)
         raise typer.Exit(code=2)
     if limit is not None and limit < 1:
         typer.echo("--limit must be positive", err=True)
@@ -108,6 +112,7 @@ def eval_suite(
             return str(run_id), metrics
 
     if run_model:
+        from webnovel.evalkit.judge import LLMJudge
         from webnovel.evalkit.model_eval import ModelEvalResult, run_cases
         from webnovel.llm.gateway.factory import build_model_client
         from webnovel.llm.prompts.registry import PromptRegistry
@@ -122,6 +127,7 @@ def eval_suite(
 
         async def generate() -> list[ModelEvalResult]:
             client = build_model_client(settings, profile="batch")
+            judge_fn = LLMJudge(client, settings.llm_model).judge if llm_judge else None
             return await run_cases(
                 loaded,
                 client=client,
@@ -129,6 +135,7 @@ def eval_suite(
                 prompt=prompt,
                 includes=includes,
                 limit=limit,
+                judge=judge_fn,
                 progress=lambda index, total, case_id: typer.echo(
                     f"[{index}/{total}] {case_id}", err=True
                 ),
@@ -204,6 +211,8 @@ def prompt_promote(
     note: str = "",
     force: bool = False,
     dry_run: bool = False,
+    min_pass_rate: float = 0.0,
+    max_latency_ms: float | None = None,
 ) -> None:
     """跑过评测后把 label 指向新 prompt 版本。"""
     import asyncio
@@ -262,6 +271,23 @@ def prompt_promote(
         if run.prompt_name != prompt_id or run.prompt_version != version:
             typer.echo(
                 "eval run does not match this prompt version; use --force if you are sure",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        if float(metrics.get("pass_rate", 0.0)) < min_pass_rate:
+            typer.echo(
+                f"eval pass_rate {metrics.get('pass_rate')} below {min_pass_rate}",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        avg_latency = metrics.get("avg_latency_ms")
+        if (
+            max_latency_ms is not None
+            and isinstance(avg_latency, (int, float))
+            and float(avg_latency) > max_latency_ms
+        ):
+            typer.echo(
+                f"eval avg_latency_ms {avg_latency} above {max_latency_ms}",
                 err=True,
             )
             raise typer.Exit(code=1)

@@ -263,6 +263,7 @@ uv run webnovel eval --suite smoke --outputs outputs.jsonl
 uv run webnovel eval --run --suite smoke \
   --prompt-id generation/continuation --prompt-version 1 \
   --limit 3 --save-outputs outputs.jsonl
+# 加 --llm-judge 让模型按 rubric 评分
 ```
 
 prompt 的规则是只加新版本，不改已发布的 `vNNN.yaml`。`labels.yaml` 负责指向当前版本。

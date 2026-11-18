@@ -70,3 +70,13 @@ async def test_run_cases_records_model_error() -> None:
     )
     assert results[0].result["passed"] is False
     assert "provider down" in results[0].result["details"]["error"]
+
+
+async def test_llm_judge_parses_json() -> None:
+    from webnovel.evalkit.judge import LLMJudge
+
+    judge = LLMJudge(FakeClient('{"passed": true, "score": 0.9, "reason": "ok"}'), "fake")  # type: ignore[arg-type]
+    result = await judge.judge(_case().spec, "旧巷里响起钟声。")
+    assert result["passed"] is True
+    assert result["score"] == 0.9
+    assert result["details"]["judge"] == "llm"
