@@ -46,6 +46,15 @@ async def stream(client: httpx.AsyncClient, generation_id: str) -> int:
     return chunks
 
 
+async def wait_visible(client: httpx.AsyncClient, path: str, label: str) -> None:
+    for _ in range(40):
+        response = await client.get(path)
+        if response.status_code == 200:
+            return
+        await asyncio.sleep(0.05)
+    raise RuntimeError(f"{label} not visible after create: {response.status_code}")
+
+
 async def main() -> None:
     total = 8
     pgdata = pathlib.Path(tempfile.mkdtemp(prefix="webnovel-stress-pg-"))
@@ -110,6 +119,7 @@ async def main() -> None:
                 await client.post("/api/v1/works", json={"title": "Stress", "genre": "悬疑"}),
                 "create work",
             )
+            await wait_visible(client, f"/api/v1/works/{work['id']}", "work")
             generation_ids: list[str] = []
             for index in range(total):
                 chapter = payload(
@@ -123,6 +133,7 @@ async def main() -> None:
                     ),
                     f"create chapter {index + 1}",
                 )
+                await wait_visible(client, f"/api/v1/chapters/{chapter['id']}", "chapter")
                 generation = payload(
                     await client.post(
                         f"/api/v1/works/{work['id']}/generations",

@@ -205,3 +205,45 @@ async def test_entity_change_status_can_be_corrected() -> None:
     service = MemoryServiceImpl(FakeChangeRepository())  # type: ignore[arg-type]
     change = await service.update_entity_change_status(uuid4(), uuid4(), "corrected")
     assert change.status == "corrected"
+
+
+def test_detects_entity_state_sequence_conflict() -> None:
+    first = _event(
+        3,
+        {
+            "entity_changes": [
+                {"entity_name": "玉佩", "field": "holder", "before": "沈砚", "after": "师姐"}
+            ]
+        },
+    )
+    second = _event(
+        4,
+        {
+            "entity_changes": [
+                {"entity_name": "玉佩", "field": "holder", "before": "掌柜", "after": "师姐"}
+            ]
+        },
+    )
+    result = detect_contradictions([first, second])
+    assert [item.kind for item in result] == ["entity.state_sequence"]
+
+
+def test_detects_knowledge_regression() -> None:
+    first = _event(
+        3,
+        {
+            "knowledge_changes": [
+                {"character_name": "沈砚", "fact_key": "钟声来自地下", "state": "knows"}
+            ]
+        },
+    )
+    second = _event(
+        4,
+        {
+            "knowledge_changes": [
+                {"character_name": "沈砚", "fact_key": "钟声来自地下", "state": "does_not_know"}
+            ]
+        },
+    )
+    result = detect_contradictions([first, second])
+    assert [item.kind for item in result] == ["knowledge.regression"]
