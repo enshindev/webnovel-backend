@@ -5,6 +5,8 @@ from typing import Any
 from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
+import pytest
+
 from webnovel.kernel.errors import ValidationError
 from webnovel.modules.chapters_versions.contract import Chapter, ChapterVersion
 from webnovel.modules.generation.contract import (
@@ -319,3 +321,11 @@ async def test_candidate_count_changes_payload_hash() -> None:
         candidate_count=3,
     )
     assert payload_hash(single) != payload_hash(triple)
+
+
+def test_normalized_edit_distance() -> None:
+    from webnovel.modules.generation.service import _normalized_edit_distance
+
+    assert _normalized_edit_distance("abc", "abc") == 0.0
+    assert _normalized_edit_distance("", "abc") == 1.0
+    assert _normalized_edit_distance("kitten", "sitting") == pytest.approx(3 / 7)

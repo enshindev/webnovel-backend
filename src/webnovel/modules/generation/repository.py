@@ -67,6 +67,8 @@ class GenerationRepository(Protocol):
 
     async def discard_draft(self, draft_id: UUID) -> Draft | None: ...
 
+    async def record_regenerated(self, generation_id: UUID, source_generation_id: UUID) -> None: ...
+
 
 def _to_domain(model: GenerationModel) -> Generation:
     return Generation(
@@ -117,27 +119,6 @@ class SqlAlchemyGenerationRepository:
             if generation is None:
                 raise ConflictError("idempotent generation not found", code="idempotency.invalid")
             return generation, False
-
-        last_stmt = (
-            select(GenerationModel)
-            .where(GenerationModel.chapter_id == command.chapter_id)
-            .order_by(GenerationModel.created_at.desc())
-            .limit(1)
-        )
-        last_generation = (await self._session.execute(last_stmt)).scalar_one_or_none()
-        if last_generation is not None and GenerationStatus(last_generation.status) in TERMINAL:
-            last_set_stmt = select(CandidateSetModel).where(
-                CandidateSetModel.generation_id == last_generation.id
-            )
-            last_set = (await self._session.execute(last_set_stmt)).scalar_one_or_none()
-            if last_set is not None:
-                self._session.add(
-                    PreferenceEventModel(
-                        candidate_set_id=last_set.id,
-                        candidate_id=str(last_generation.draft_id or last_generation.id),
-                        event_type="regenerated",
-                    )
-                )
 
         active_stmt = (
             select(GenerationModel)
@@ -253,6 +234,25 @@ class SqlAlchemyGenerationRepository:
         )
         models = (await self._session.scalars(stmt)).all()
         return [_draft_to_domain(model) for model in models]
+
+    async def record_regenerated(self, generation_id: UUID, source_generation_id: UUID) -> None:
+        candidate_set = (
+            await self._session.scalars(
+                select(CandidateSetModel).where(CandidateSetModel.generation_id == generation_id)
+            )
+        ).first()
+        generation = await self._session.get(GenerationModel, generation_id)
+        if candidate_set is None or generation is None:
+            return
+        self._session.add(
+            PreferenceEventModel(
+                candidate_set_id=candidate_set.id,
+                candidate_id=str(generation.draft_id or generation.id),
+                event_type="regenerated",
+                event_metadata={"source_generation_id": str(source_generation_id)},
+            )
+        )
+        await self._session.flush()
 
     async def accept_draft(
         self, draft_id: UUID, chapter_version_id: UUID, edit_distance: float

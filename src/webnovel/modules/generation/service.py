@@ -150,7 +150,9 @@ class GenerationsService:
             target_words=original.target_words,
             candidate_count=max(1, min(MAX_CANDIDATE_COUNT, len(previous))),
         )
-        return await self.create(command, f"retry:{generation_id.hex[:16]}:{uuid4().hex[:16]}")
+        retried = await self.create(command, f"retry:{generation_id.hex[:16]}:{uuid4().hex[:16]}")
+        await self._repository.record_regenerated(retried.id, original.id)
+        return retried
 
     async def discard_draft(self, draft_id: UUID) -> Draft:
         draft = await self._repository.discard_draft(draft_id)
@@ -182,7 +184,7 @@ class GenerationsService:
         accepted = await self._repository.accept_draft(
             draft_id=draft.id,
             chapter_version_id=version.id,
-            edit_distance=0.0,
+            edit_distance=_normalized_edit_distance(draft.content, version.content),
         )
         if accepted is None:
             raise NotFoundError(f"draft not found: {draft_id}", code="draft.not_found")
@@ -206,3 +208,23 @@ class GenerationsService:
                 {"chapter_id": str(chapter.id), "version_id": str(version.id)},
             )
         return AcceptedDraft(draft=accepted, chapter_version=version)
+
+
+def _normalized_edit_distance(left: str, right: str) -> float:
+    if left == right:
+        return 0.0
+    if not left or not right:
+        return 1.0
+    previous = list(range(len(right) + 1))
+    for i, left_char in enumerate(left, start=1):
+        current = [i]
+        for j, right_char in enumerate(right, start=1):
+            current.append(
+                min(
+                    current[-1] + 1,
+                    previous[j] + 1,
+                    previous[j - 1] + (left_char != right_char),
+                )
+            )
+        previous = current
+    return previous[-1] / max(len(left), len(right))
