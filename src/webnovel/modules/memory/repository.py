@@ -13,6 +13,7 @@ from webnovel.modules.memory.contract import (
     ChangeProposal,
     Entity,
     EntityRelation,
+    EntityStateChange,
     ExtractionRun,
     ExtractionStatus,
     Foreshadow,
@@ -28,6 +29,7 @@ from webnovel.modules.memory.models import (
     EntityModel,
     EntityRelationModel,
     EntityRevisionModel,
+    EntityStateChangeModel,
     ExtractionRunModel,
     ExtractionStepModel,
     ForeshadowModel,
@@ -161,6 +163,16 @@ class MemoryRepository(Protocol):
     async def list_relations(
         self, work_id: UUID, entity_id: UUID | None = None, limit: int = 100, offset: int = 0
     ) -> list[EntityRelation]: ...
+
+    async def list_entity_changes(
+        self,
+        work_id: UUID,
+        entity_id: UUID | None = None,
+        *,
+        at_chapter: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[EntityStateChange]: ...
 
     async def add_foreshadow(
         self,
@@ -624,6 +636,9 @@ class SqlAlchemyMemoryRepository:
         events: list[dict[str, Any]],
     ) -> list[StoryEvent]:
         await self._session.execute(
+            delete(EntityStateChangeModel).where(EntityStateChangeModel.chapter_id == chapter_id)
+        )
+        await self._session.execute(
             delete(KnowledgeStateModel).where(KnowledgeStateModel.chapter_id == chapter_id)
         )
         await self._session.execute(
@@ -663,6 +678,23 @@ class SqlAlchemyMemoryRepository:
                         fact_value=cast(dict[str, object], change.get("fact_value", {})),
                         state=str(change.get("state", "knows")),
                         learned_event_id=event.id,
+                        chapter_id=chapter_id,
+                        chapter_number=chapter_number,
+                        source_span=cast(dict[str, object], item.get("source_span", {})),
+                        confidence=cast(float | None, item.get("confidence")),
+                        status="inferred",
+                    )
+                )
+            for change in cast(list[dict[str, Any]], item.get("entity_changes", [])):
+                self._session.add(
+                    EntityStateChangeModel(
+                        work_id=work_id,
+                        entity_id=None,
+                        entity_name=str(change["entity_name"]),
+                        field=str(change["field"]),
+                        before=cast(dict[str, object], change.get("before", {})),
+                        after=cast(dict[str, object], change.get("after", {})),
+                        event_id=event.id,
                         chapter_id=chapter_id,
                         chapter_number=chapter_number,
                         source_span=cast(dict[str, object], item.get("source_span", {})),
@@ -766,6 +798,28 @@ class SqlAlchemyMemoryRepository:
         )
         models = (await self._session.scalars(stmt)).all()
         return [_relation_to_domain(model) for model in models]
+
+    async def list_entity_changes(
+        self,
+        work_id: UUID,
+        entity_id: UUID | None = None,
+        *,
+        at_chapter: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[EntityStateChange]:
+        stmt = select(EntityStateChangeModel).where(EntityStateChangeModel.work_id == work_id)
+        if entity_id is not None:
+            stmt = stmt.where(EntityStateChangeModel.entity_id == entity_id)
+        if at_chapter is not None:
+            stmt = stmt.where(EntityStateChangeModel.chapter_number <= at_chapter)
+        stmt = (
+            stmt.order_by(EntityStateChangeModel.chapter_number, EntityStateChangeModel.created_at)
+            .limit(limit)
+            .offset(offset)
+        )
+        models = (await self._session.scalars(stmt)).all()
+        return [_entity_change_to_domain(model) for model in models]
 
     async def get_entity(self, entity_id: UUID) -> Entity | None:
         model = await self._session.get(EntityModel, entity_id)
@@ -910,4 +964,18 @@ def _relation_to_domain(model: EntityRelationModel) -> EntityRelation:
         to_entity_id=model.to_entity_id,
         relation_type=model.relation_type,
         since_chapter_id=model.since_chapter_id,
+    )
+
+
+def _entity_change_to_domain(model: EntityStateChangeModel) -> EntityStateChange:
+    return EntityStateChange(
+        id=model.id,
+        work_id=model.work_id,
+        entity_id=model.entity_id,
+        entity_name=model.entity_name,
+        field=model.field,
+        before=dict(model.before),
+        after=dict(model.after),
+        chapter_number=model.chapter_number,
+        status=model.status,
     )

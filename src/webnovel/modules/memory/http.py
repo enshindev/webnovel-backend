@@ -155,6 +155,24 @@ class EntityRelationList(BaseModel):
     items: list[EntityRelationOut]
 
 
+class EntityStateChangeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    work_id: UUID
+    entity_id: UUID | None
+    entity_name: str
+    field: str
+    before: dict[str, Any]
+    after: dict[str, Any]
+    chapter_number: int
+    status: str
+
+
+class EntityStateChangeList(BaseModel):
+    items: list[EntityStateChangeOut]
+
+
 class ForeshadowCreate(BaseModel):
     description: str = Field(min_length=1, max_length=4_000)
     planted_chapter_id: UUID | None = None
@@ -291,6 +309,30 @@ async def list_story_events(
         offset=offset,
     )
     return StoryEventList(items=[StoryEventOut.model_validate(event) for event in events])
+
+
+@router.get(
+    "/works/{work_id}/story-state/entity-changes",
+    response_model=EntityStateChangeList,
+)
+async def list_entity_changes(
+    work_id: UUID,
+    service: MemoryServiceDep,
+    entity_id: UUID | None = None,
+    at_chapter: int | None = None,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> EntityStateChangeList:
+    changes = await service.list_entity_changes(
+        work_id,
+        entity_id,
+        at_chapter=at_chapter,
+        limit=limit,
+        offset=offset,
+    )
+    return EntityStateChangeList(
+        items=[EntityStateChangeOut.model_validate(change) for change in changes]
+    )
 
 
 @router.get("/works/{work_id}/story-state/relations", response_model=EntityRelationList)

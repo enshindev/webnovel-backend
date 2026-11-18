@@ -292,6 +292,21 @@ class ExtractionRunner:
                     "state": state,
                 }
             )
+        normalized_entity_changes: list[dict[str, Any]] = []
+        for change in entity_changes:
+            change = cast(dict[str, Any], change)
+            entity_name = str(change.get("entity", "")).strip()
+            field = str(change.get("field", "")).strip()
+            if not entity_name or not field:
+                continue
+            normalized_entity_changes.append(
+                {
+                    "entity_name": entity_name,
+                    "field": field,
+                    "before": {"value": change.get("before")},
+                    "after": {"value": change.get("after")},
+                }
+            )
         return {
             "index": int(item.get("index", 0)),
             "summary": summary,
@@ -299,7 +314,7 @@ class ExtractionRunner:
             "location": str(item.get("location")).strip() if item.get("location") else None,
             "participants": participants,
             "knowledge_changes": knowledge_changes,
-            "entity_changes": entity_changes,
+            "entity_changes": normalized_entity_changes,
             "source_span": {"quote": str(item.get("quote", ""))},
             "confidence": self._confidence(item),
         }

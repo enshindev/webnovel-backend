@@ -243,3 +243,24 @@ class KnowledgeStateModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class EntityStateChangeModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "entity_state_changes"
+
+    work_id: Mapped[UUID] = mapped_column(ForeignKey("works.id", ondelete="CASCADE"))
+    entity_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("entities.id", ondelete="SET NULL"), nullable=True
+    )
+    entity_name: Mapped[str] = mapped_column(String(200))
+    field: Mapped[str] = mapped_column(String(64))
+    before: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    after: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    event_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("story_events.id", ondelete="SET NULL"), nullable=True
+    )
+    chapter_id: Mapped[UUID] = mapped_column(ForeignKey("chapters.id", ondelete="CASCADE"))
+    chapter_number: Mapped[int] = mapped_column()
+    source_span: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="inferred")

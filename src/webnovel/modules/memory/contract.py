@@ -77,6 +77,19 @@ class ResolvedProposal:
 
 
 @dataclass(frozen=True, slots=True)
+class EntityStateChange:
+    id: UUID
+    work_id: UUID
+    entity_id: UUID | None
+    entity_name: str
+    field: str
+    before: dict[str, Any]
+    after: dict[str, Any]
+    chapter_number: int
+    status: str
+
+
+@dataclass(frozen=True, slots=True)
 class EntityRelation:
     id: UUID
     work_id: UUID
@@ -244,6 +257,16 @@ class MemoryService(Protocol):
     async def list_relations(
         self, work_id: UUID, entity_id: UUID | None = None, limit: int = 100, offset: int = 0
     ) -> list[EntityRelation]: ...
+
+    async def list_entity_changes(
+        self,
+        work_id: UUID,
+        entity_id: UUID | None = None,
+        *,
+        at_chapter: int | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[EntityStateChange]: ...
 
     async def create_foreshadow(
         self,

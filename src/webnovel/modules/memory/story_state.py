@@ -27,9 +27,11 @@ def detect_contradictions(events: list[StoryEvent]) -> list[Contradiction]:
         for item in changes.get("entity_changes", []) or []:
             if not isinstance(item, dict):
                 continue
-            entity = str(item.get("entity", "")).strip()
+            entity = str(item.get("entity_name") or item.get("entity") or "").strip()
             field = str(item.get("field", "")).strip()
             after = item.get("after")
+            if isinstance(after, dict):
+                after = after.get("value")
             if entity and field in {"location", "holder"} and after:
                 entity_states[(event.chapter_number, entity, field)].append(
                     {"after": str(after), "event_id": str(event.id), "summary": event.summary}

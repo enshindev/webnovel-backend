@@ -50,6 +50,7 @@ async def test_postgres_migrations_apply(
             "prompt_labels",
             "story_events",
             "knowledge_states",
+            "entity_state_changes",
         } <= tables
         assert "conversations" in tables
     finally:

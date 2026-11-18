@@ -162,3 +162,23 @@ def test_no_contradiction_for_normal_events() -> None:
         },
     )
     assert detect_contradictions([event]) == []
+
+
+async def test_event_payload_normalizes_entity_changes() -> None:
+    payload = await _runner()._event_payload(
+        uuid4(),
+        {
+            "summary": "玉佩换了主人",
+            "entity_changes": [
+                {"entity": "玉佩", "field": "holder", "before": "沈砚", "after": "师姐"}
+            ],
+        },
+    )
+    assert payload["entity_changes"] == [
+        {
+            "entity_name": "玉佩",
+            "field": "holder",
+            "before": {"value": "沈砚"},
+            "after": {"value": "师姐"},
+        }
+    ]
