@@ -253,7 +253,7 @@ class ExtractionRunner:
                 for item in raw_events
             ]
             await self._repository.replace_story_events(
-                work_id, chapter_id, version_id, chapter_number, events
+                work_id, chapter_id, version_id, chapter_number, events, run_id=run_id
             )
             await self._record_usage(work_id, "event", rendered, raw_result)
             await self._repository.finish_step(

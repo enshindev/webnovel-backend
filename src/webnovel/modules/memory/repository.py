@@ -135,6 +135,7 @@ class MemoryRepository(Protocol):
         version_id: UUID,
         chapter_number: int,
         events: list[dict[str, Any]],
+        run_id: UUID | None = None,
     ) -> list[StoryEvent]: ...
 
     async def list_story_events(
@@ -670,7 +671,20 @@ class SqlAlchemyMemoryRepository:
         version_id: UUID,
         chapter_number: int,
         events: list[dict[str, Any]],
+        run_id: UUID | None = None,
     ) -> list[StoryEvent]:
+        old_run_ids = select(ExtractionRunModel.id).where(
+            ExtractionRunModel.chapter_id == chapter_id
+        )
+        if run_id is not None:
+            old_run_ids = old_run_ids.where(ExtractionRunModel.id != run_id)
+        await self._session.execute(
+            delete(ChangeProposalModel).where(
+                ChangeProposalModel.work_id == work_id,
+                ChangeProposalModel.status == "pending",
+                ChangeProposalModel.run_id.in_(old_run_ids),
+            )
+        )
         await self._session.execute(
             delete(EntityStateChangeModel).where(EntityStateChangeModel.chapter_id == chapter_id)
         )
