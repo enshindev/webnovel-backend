@@ -20,6 +20,7 @@ from webnovel.modules.memory.repository import MemoryRepository
 from webnovel.modules.usage.contract import UsageService
 
 logger = structlog.get_logger(__name__)
+_EXTRACTION_STEPS = 3
 
 
 def parse_json(text: str) -> Any:
@@ -80,7 +81,7 @@ class ExtractionRunner:
             run.id, run.work_id, run.chapter_id, run.version_id, chapter.number, text, errors
         )
 
-        if len(errors) == 3:
+        if len(errors) == _EXTRACTION_STEPS:
             status = ExtractionStatus.FAILED
         elif errors:
             status = ExtractionStatus.PARTIAL
