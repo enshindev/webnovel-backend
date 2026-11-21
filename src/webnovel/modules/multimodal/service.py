@@ -5,6 +5,7 @@ from uuid import UUID
 from webnovel.kernel.errors import UnavailableError
 from webnovel.modules.multimodal.contract import (
     CoverProvider,
+    MultimodalStatus,
     SpeechProvider,
     TranscriptionProvider,
 )
@@ -25,12 +26,12 @@ class MultimodalService:
         self._cover = cover
         self._usage = usage
 
-    def status(self) -> dict[str, bool]:
-        return {
-            "asr": self._asr is not None,
-            "tts": self._tts is not None,
-            "cover": self._cover is not None,
-        }
+    def status(self) -> MultimodalStatus:
+        return MultimodalStatus(
+            asr=self._asr is not None,
+            tts=self._tts is not None,
+            cover=self._cover is not None,
+        )
 
     async def transcribe(
         self, filename: str, content_type: str, data: bytes, *, work_id: UUID | None = None

@@ -147,7 +147,14 @@ class MemoryServiceImpl(MemoryService):
         )
 
     async def contradictions(self, work_id: UUID) -> list[Contradiction]:
-        events = await self._repository.list_story_events(work_id)
+        events = []
+        offset = 0
+        while True:
+            batch = await self._repository.list_story_events(work_id, limit=500, offset=offset)
+            events.extend(batch)
+            if len(batch) < 500:
+                break
+            offset += 500
         return detect_contradictions(events)
 
     async def list_relations(

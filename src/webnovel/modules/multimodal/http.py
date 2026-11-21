@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, cast
 from uuid import UUID
 
 from fastapi import APIRouter, File, Form, UploadFile
@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from webnovel.entrypoints.api.deps import MultimodalServiceDep
 from webnovel.kernel.errors import ValidationError
+from webnovel.modules.multimodal.contract import MultimodalStatus
 
 router = APIRouter(prefix="/experiments/multimodal", tags=["multimodal"])
 
@@ -31,15 +32,9 @@ class CoverBody(BaseModel):
     work_id: UUID | None = None
 
 
-class MultimodalStatus(BaseModel):
-    asr: bool
-    tts: bool
-    cover: bool
-
-
 @router.get("/status", response_model=MultimodalStatus)
 async def status(service: MultimodalServiceDep) -> MultimodalStatus:
-    return MultimodalStatus(**service.status())
+    return cast(MultimodalStatus, service.status())
 
 
 @router.post("/transcribe", response_model=TranscribeOut)

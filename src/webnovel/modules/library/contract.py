@@ -49,6 +49,13 @@ class LibraryService(Protocol):
 
     async def delete_document(self, document_id: UUID) -> None: ...
 
-    async def search(self, query: str, limit: int = 8) -> list[dict[str, object]]: ...
+    async def search(
+        self,
+        query: str,
+        limit: int = 8,
+        *,
+        work_id: UUID | None = None,
+        collection_id: UUID | None = None,
+    ) -> list[dict[str, object]]: ...
 
     async def reindex(self, document_id: UUID) -> LibraryDocument: ...

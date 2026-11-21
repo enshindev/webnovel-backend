@@ -4,7 +4,7 @@ from uuid import UUID
 
 from webnovel.kernel.errors import NotFoundError, ValidationError
 from webnovel.modules.graphrag.contract import GraphEdge, GraphEvent, GraphNode, GraphSubgraph
-from webnovel.modules.memory.contract import Entity, EntityRelation, MemoryService
+from webnovel.modules.memory.contract import Entity, EntityRelation, MemoryService, StoryEvent
 
 
 class GraphRagService:
@@ -124,9 +124,8 @@ class GraphRagService:
         return next((entity for entity in entities if wanted in entity.name.casefold()), None)
 
     @staticmethod
-    def _event_touches(event: object, names: set[str]) -> bool:
-        participants = getattr(event, "participants", []) or []
-        for participant in participants:
+    def _event_touches(event: StoryEvent, names: set[str]) -> bool:
+        for participant in event.participants or []:
             if isinstance(participant, dict) and str(participant.get("name", "")).strip() in names:
                 return True
-        return any(name in getattr(event, "summary", "") for name in names)
+        return any(name in event.summary for name in names)

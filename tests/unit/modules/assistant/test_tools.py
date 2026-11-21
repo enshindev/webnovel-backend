@@ -140,7 +140,8 @@ def _tools() -> AssistantTools:
 
 
 def test_tool_schemas_include_story_state_tools() -> None:
-    names = {schema["function"]["name"] for schema in AssistantTools.schemas()}  # type: ignore[index]
+    tools = _tools()
+    names = {schema["function"]["name"] for schema in tools.schemas()}  # type: ignore[index]
     assert {
         "who_knows",
         "get_story_events",
@@ -192,7 +193,14 @@ async def test_timeline_summary_and_foreshadow_tools() -> None:
 
 
 class FakeLibrary:
-    async def search(self, query: str, limit: int = 8) -> list[dict[str, object]]:
+    async def search(
+        self,
+        query: str,
+        limit: int = 8,
+        *,
+        work_id: UUID | None = None,
+        collection_id: UUID | None = None,
+    ) -> list[dict[str, object]]:
         assert query == "旧巷"
         return [{"document_id": "doc-1", "chunk_index": 0, "text": "旧巷资料"}]
 

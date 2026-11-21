@@ -176,6 +176,7 @@ async def test_event_payload_normalizes_entity_changes() -> None:
     )
     assert payload["entity_changes"] == [
         {
+            "entity_id": "",
             "entity_name": "玉佩",
             "field": "holder",
             "before": {"value": "沈砚"},

@@ -162,17 +162,26 @@ class LibraryServiceImpl(LibraryService):
             return text
         return _parse_text(data, suffix)
 
-    async def search(self, query: str, limit: int = 8) -> list[dict[str, object]]:
+    async def search(
+        self,
+        query: str,
+        limit: int = 8,
+        *,
+        work_id: UUID | None = None,
+        collection_id: UUID | None = None,
+    ) -> list[dict[str, object]]:
         if self._embedding_client is None:
             raise ValidationError(
                 "library search requires embedding", code="library.search_unavailable"
             )
         vector = (await self._embedding_client.embed([query]))[0]
-        vector_hits = await self._repository.search(vector, limit)
+        vector_hits = await self._repository.search(
+            vector, limit, work_id=work_id, collection_id=collection_id
+        )
         list_all = getattr(self._repository, "list_all_chunks", None)
         if list_all is None:
             return vector_hits
-        all_chunks = await list_all()
+        all_chunks = await list_all(work_id=work_id, collection_id=collection_id)
         if not all_chunks:
             return vector_hits
         bm25 = BM25Index([str(chunk["text"]) for chunk in all_chunks])

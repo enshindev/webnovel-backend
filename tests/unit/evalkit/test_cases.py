@@ -11,14 +11,14 @@ ROOT = Path(__file__).resolve().parents[3]
 
 def test_loads_smoke_cases_from_real_evals() -> None:
     cases = load_cases(ROOT / "evals", suite="smoke")
-    assert len(cases) == 26
+    assert len(cases) == 29
     assert all("smoke" in case.spec.tags for case in cases)
-    assert len({case.spec.id for case in cases}) == 26
+    assert len({case.spec.id for case in cases}) == 29
 
 
 def test_full_suite_includes_everything() -> None:
     cases = load_cases(ROOT / "evals", suite="full")
-    assert len(cases) == 26
+    assert len(cases) == 29
 
 
 def test_rejects_duplicate_ids(tmp_path: Path) -> None:

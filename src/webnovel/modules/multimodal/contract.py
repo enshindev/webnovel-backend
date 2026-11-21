@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Protocol
 
 
@@ -13,3 +14,10 @@ class SpeechProvider(Protocol):
 
 class CoverProvider(Protocol):
     async def generate(self, prompt: str, size: str = "1024x1024") -> bytes: ...
+
+
+@dataclass(frozen=True, slots=True)
+class MultimodalStatus:
+    asr: bool
+    tts: bool
+    cover: bool

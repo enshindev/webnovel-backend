@@ -240,9 +240,6 @@ class KnowledgeStateModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     source_span: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     status: Mapped[str] = mapped_column(String(16), default="inferred")
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
 
 
 class EntityStateChangeModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):

@@ -1,0 +1,3 @@
+{"id": "mem-event-001", "input": {"chapter_text": "雨夜，沈砚在旧巷听见第二声钟响。他确认钟声来自地下。"}, "expected_facts": ["旧巷", "钟声"], "constraints": ["只记录本章明确事件", "输出 JSON"], "rubric": "是否抽取旧巷钟声事件和沈砚获得的知识", "tags": ["smoke"], "must_pass": true}
+{"id": "mem-event-002", "input": {"chapter_text": "师姐把玉佩交给沈砚，说这是师父留下的。沈砚接过玉佩，没有多问。"}, "expected_facts": ["玉佩", "沈砚"], "constraints": ["participants 用角色名", "不推测后续"], "rubric": "是否记录玉佩转手事件和参与者", "tags": ["smoke"], "must_pass": false}
+{"id": "mem-event-003", "input": {"chapter_text": "山门试炼开始，石阶上有一道新鲜剑痕。众人停在阶前，没有人先动。"}, "expected_facts": ["石阶", "剑痕"], "constraints": ["没有事件时返回空数组", "不添加未出现的人物"], "rubric": "是否抽取试炼开始和剑痕两个事实", "tags": ["smoke"], "must_pass": false}

@@ -241,8 +241,14 @@ class ExtractionRunner:
             )
             if not isinstance(raw_events, list):
                 raise ValueError("events must be a list")
+            entities = await self._repository.list_entities(work_id, limit=500)
+            entity_map: dict[str, UUID] = {}
+            for entity in entities:
+                entity_map[entity.name.casefold()] = entity.id
+                for alias in entity.aliases:
+                    entity_map[alias.casefold()] = entity.id
             events = [
-                await self._event_payload(work_id, cast(dict[str, Any], item))
+                await self._event_payload(work_id, cast(dict[str, Any], item), entity_map)
                 for item in raw_events
             ]
             await self._repository.replace_story_events(
@@ -260,7 +266,12 @@ class ExtractionRunner:
             await self._repository.finish_step(step_id, "failed", error=str(exc))
             errors.append(f"event: {exc}")
 
-    async def _event_payload(self, work_id: UUID, item: dict[str, Any]) -> dict[str, Any]:
+    async def _event_payload(
+        self,
+        work_id: UUID,
+        item: dict[str, Any],
+        entity_map: dict[str, UUID] | None = None,
+    ) -> dict[str, Any]:
         summary = str(item.get("summary", "")).strip()
         if not summary:
             raise ValueError("event requires summary")
@@ -301,6 +312,7 @@ class ExtractionRunner:
                 continue
             normalized_entity_changes.append(
                 {
+                    "entity_id": str((entity_map or {}).get(entity_name.casefold(), "")),
                     "entity_name": entity_name,
                     "field": field,
                     "before": {"value": change.get("before")},

@@ -223,7 +223,7 @@ def prompt_promote(
     from webnovel.llm.prompts.registry import PromptRegistry
     from webnovel.modules.audit.repository import SqlAlchemyAuditRepository
     from webnovel.modules.audit.service import AuditServiceImpl
-    from webnovel.modules.prompts.promotion import promote_label
+    from webnovel.modules.prompts.promotion import promote_label, read_label
     from webnovel.modules.prompts.repository import SqlAlchemyPromptCatalogRepository
     from webnovel.modules.prompts.service import PromptCatalogService
     from webnovel.modules.quality.contract import EvalRunInfo
@@ -292,10 +292,12 @@ def prompt_promote(
             )
             raise typer.Exit(code=1)
 
-    previous = promote_label(settings.prompts_dir, prompt_id, version, label)
     if dry_run:
+        previous = read_label(settings.prompts_dir, prompt_id, label)
         typer.echo(f"would promote {prompt_id}@{label}: {previous or '-'} -> {version} (dry run)")
         return
+
+    previous = promote_label(settings.prompts_dir, prompt_id, version, label)
 
     async def record() -> None:
         async with session_factory() as session, session.begin():

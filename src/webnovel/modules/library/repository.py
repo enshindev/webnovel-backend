@@ -41,7 +41,14 @@ class LibraryRepository(Protocol):
         self, document_id: UUID, chunks: list[tuple[str, list[float], str]]
     ) -> None: ...
 
-    async def search(self, embedding: list[float], limit: int) -> list[dict[str, Any]]: ...
+    async def search(
+        self,
+        embedding: list[float],
+        limit: int,
+        *,
+        collection_id: UUID | None = None,
+        work_id: UUID | None = None,
+    ) -> list[dict[str, Any]]: ...
 
 
 def _collection(model: LibraryCollectionModel) -> LibraryCollection:
@@ -161,14 +168,19 @@ class SqlAlchemyLibraryRepository:
             )
         await self._session.flush()
 
-    async def list_all_chunks(self) -> list[dict[str, Any]]:
-        rows = (
-            await self._session.execute(
-                select(LibraryChunkModel, LibraryDocumentModel.title).join(
-                    LibraryDocumentModel, LibraryDocumentModel.id == LibraryChunkModel.document_id
-                )
+    async def list_all_chunks(
+        self, *, collection_id: UUID | None = None, work_id: UUID | None = None
+    ) -> list[dict[str, Any]]:
+        stmt = select(LibraryChunkModel, LibraryDocumentModel.title).join(
+            LibraryDocumentModel, LibraryDocumentModel.id == LibraryChunkModel.document_id
+        )
+        if collection_id is not None:
+            stmt = stmt.where(LibraryDocumentModel.collection_id == collection_id)
+        if work_id is not None:
+            stmt = stmt.join(LibraryCollectionModel).where(
+                LibraryCollectionModel.work_id == work_id
             )
-        ).all()
+        rows = (await self._session.execute(stmt)).all()
         return [
             {
                 "document_id": row[0].document_id,
@@ -179,7 +191,14 @@ class SqlAlchemyLibraryRepository:
             for row in rows
         ]
 
-    async def search(self, embedding: list[float], limit: int) -> list[dict[str, Any]]:
+    async def search(
+        self,
+        embedding: list[float],
+        limit: int,
+        *,
+        collection_id: UUID | None = None,
+        work_id: UUID | None = None,
+    ) -> list[dict[str, Any]]:
         from sqlalchemy import select
 
         distance = LibraryChunkModel.embedding.cosine_distance(embedding)
@@ -189,6 +208,12 @@ class SqlAlchemyLibraryRepository:
             .order_by(distance)
             .limit(limit)
         )
+        if collection_id is not None:
+            stmt = stmt.where(LibraryDocumentModel.collection_id == collection_id)
+        if work_id is not None:
+            stmt = stmt.join(LibraryCollectionModel).where(
+                LibraryCollectionModel.work_id == work_id
+            )
         rows = (await self._session.execute(stmt)).all()
         return [
             {

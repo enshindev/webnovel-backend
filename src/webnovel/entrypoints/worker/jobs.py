@@ -230,13 +230,17 @@ async def run_agent(ctx: object, run_id: str) -> None:
             retrieval=retrieval,
             memory_repository=memory_repository,
             story_state=MemoryServiceImpl(memory_repository),
-            library=LibraryServiceImpl(
-                SqlAlchemyLibraryRepository(session),
-                settings,
-                embedding_client,
-                usage,
-                build_reranker(settings),
-                build_transcription_provider(settings),
+            library=(
+                LibraryServiceImpl(
+                    SqlAlchemyLibraryRepository(session),
+                    settings,
+                    embedding_client,
+                    usage,
+                    build_reranker(settings),
+                    build_transcription_provider(settings),
+                )
+                if settings.assistant_library_search_enabled
+                else None
             ),
         )
         executor = AgentExecutor(

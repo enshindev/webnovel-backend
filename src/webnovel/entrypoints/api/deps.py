@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 import structlog
@@ -53,7 +53,6 @@ from webnovel.modules.generation.contract import GenerationService
 from webnovel.modules.generation.preference import SqlAlchemyPreferenceRecorder
 from webnovel.modules.generation.repository import SqlAlchemyGenerationRepository
 from webnovel.modules.generation.service import GenerationsService
-from webnovel.modules.graphrag.service import GraphRagService
 from webnovel.modules.library.contract import LibraryService
 from webnovel.modules.library.repository import SqlAlchemyLibraryRepository
 from webnovel.modules.library.service import LibraryServiceImpl
@@ -66,13 +65,6 @@ from webnovel.modules.memory.materializer import EntityMaterializerImpl
 from webnovel.modules.memory.repository import SqlAlchemyMemoryRepository
 from webnovel.modules.memory.retrieval import MemoryVectorService
 from webnovel.modules.memory.service import MemoryServiceImpl
-from webnovel.modules.multimodal.factory import (
-    build_cover_provider,
-    build_multimodal_service,
-    build_speech_provider,
-    build_transcription_provider,
-)
-from webnovel.modules.multimodal.service import MultimodalService
 from webnovel.modules.outbox.contract import OutboxService
 from webnovel.modules.outbox.repository import SqlAlchemyOutboxRepository
 from webnovel.modules.outbox.service import OutboxServiceImpl
@@ -137,6 +129,8 @@ def get_audit_service(session: SessionDep) -> AuditService:
 
 
 def get_library_service(session: SessionDep, settings: SettingsDep) -> LibraryService:
+    from webnovel.modules.multimodal.factory import build_transcription_provider
+
     embedding_client = build_embedding_client(settings)
     usage = UsageServiceImpl(
         SqlAlchemyUsageRepository(session), load_pricing(settings.pricing_config_path)
@@ -257,7 +251,9 @@ def get_memory_service(session: SessionDep, settings: SettingsDep) -> MemoryServ
     return MemoryServiceImpl(SqlAlchemyMemoryRepository(session), queue.enqueue_extraction, indexer)
 
 
-def get_multimodal_service(session: SessionDep, settings: SettingsDep) -> MultimodalService:
+def get_multimodal_service(session: SessionDep, settings: SettingsDep) -> Any:
+    from webnovel.modules.multimodal.factory import build_multimodal_service
+
     usage = UsageServiceImpl(
         SqlAlchemyUsageRepository(session), load_pricing(settings.pricing_config_path)
     )
@@ -266,7 +262,9 @@ def get_multimodal_service(session: SessionDep, settings: SettingsDep) -> Multim
 
 def get_graphrag_service(
     memory: Annotated[MemoryService, Depends(get_memory_service)],
-) -> GraphRagService:
+) -> Any:
+    from webnovel.modules.graphrag.service import GraphRagService
+
     return GraphRagService(memory)
 
 
@@ -297,17 +295,23 @@ def get_assistant_service(
         if embedding_client is not None
         else None
     )
+    from webnovel.modules.multimodal.factory import build_transcription_provider
+
     tools = AssistantTools(
         retrieval=retrieval,
         memory_repository=memory_repository,
         story_state=MemoryServiceImpl(memory_repository),
-        library=LibraryServiceImpl(
-            SqlAlchemyLibraryRepository(session),
-            settings,
-            embedding_client,
-            usage,
-            reranker,
-            build_transcription_provider(settings),
+        library=(
+            LibraryServiceImpl(
+                SqlAlchemyLibraryRepository(session),
+                settings,
+                embedding_client,
+                usage,
+                reranker,
+                build_transcription_provider(settings),
+            )
+            if settings.assistant_library_search_enabled
+            else None
         ),
     )
     knowledge_store = (
@@ -406,6 +410,11 @@ def get_export_service(
     outbox: Annotated[OutboxService, Depends(get_outbox_service)],
     settings: SettingsDep,
 ) -> ExportService:
+    from webnovel.modules.multimodal.factory import (
+        build_cover_provider,
+        build_speech_provider,
+    )
+
     queue = ArqExportQueue(settings.redis_url)
     return ExportServiceImpl(
         SqlAlchemyExportRepository(session),
@@ -455,8 +464,8 @@ WorkServiceDep = Annotated[WorkService, Depends(get_work_service)]
 ChapterServiceDep = Annotated[ChapterService, Depends(get_chapter_service)]
 GenerationServiceDep = Annotated[GenerationService, Depends(get_generation_service)]
 MemoryServiceDep = Annotated[MemoryService, Depends(get_memory_service)]
-GraphRagServiceDep = Annotated[GraphRagService, Depends(get_graphrag_service)]
-MultimodalServiceDep = Annotated[MultimodalService, Depends(get_multimodal_service)]
+GraphRagServiceDep = Annotated[Any, Depends(get_graphrag_service)]
+MultimodalServiceDep = Annotated[Any, Depends(get_multimodal_service)]
 AuditServiceDep = Annotated[AuditService, Depends(get_audit_service)]
 AnalysisServiceDep = Annotated[AnalysisService, Depends(get_analysis_service)]
 LibraryServiceDep = Annotated[LibraryService, Depends(get_library_service)]

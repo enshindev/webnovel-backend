@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     story_state_contradictions_in_quality: bool = False
     assistant_max_tool_rounds: int = 20
     assistant_tool_timeout_seconds: float = 30.0
+    assistant_library_search_enabled: bool = False
     enable_experiments: bool = False
     api_token: str = ""
     rate_limit_per_minute: int = 0

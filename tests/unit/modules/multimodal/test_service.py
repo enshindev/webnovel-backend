@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from webnovel.kernel.errors import UnavailableError
+from webnovel.modules.multimodal.contract import MultimodalStatus
 from webnovel.modules.multimodal.service import MultimodalService
 
 
@@ -28,7 +29,7 @@ class FakeCover:
 
 async def test_service_delegates_to_configured_providers() -> None:
     service = MultimodalService(asr=FakeASR(), tts=FakeTTS(), cover=FakeCover())
-    assert service.status() == {"asr": True, "tts": True, "cover": True}
+    assert service.status() == MultimodalStatus(asr=True, tts=True, cover=True)
     assert await service.transcribe("a.wav", "audio/wav", b"audio") == "转写结果"
     assert await service.synthesize("你好", "alloy") == b"audio-bytes"
     assert await service.cover("雨夜旧巷") == b"\xff\xd8\xffimage"
@@ -36,6 +37,6 @@ async def test_service_delegates_to_configured_providers() -> None:
 
 async def test_unconfigured_provider_raises_service_unavailable() -> None:
     service = MultimodalService()
-    assert service.status() == {"asr": False, "tts": False, "cover": False}
+    assert service.status() == MultimodalStatus(asr=False, tts=False, cover=False)
     with pytest.raises(UnavailableError):
         await service.transcribe("a.wav", "audio/wav", b"audio")

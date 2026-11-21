@@ -5,6 +5,15 @@ from pathlib import Path
 import yaml
 
 
+def read_label(root: Path, prompt_id: str, label: str = "production") -> int | None:
+    labels_path = root / prompt_id / "labels.yaml"
+    if not labels_path.exists():
+        return None
+    data = yaml.safe_load(labels_path.read_text(encoding="utf-8")) or {}
+    value = (data.get("labels") or {}).get(label)
+    return int(value) if value is not None else None
+
+
 def promote_label(
     root: Path, prompt_id: str, version: int, label: str = "production"
 ) -> int | None:

@@ -718,10 +718,11 @@ class SqlAlchemyMemoryRepository:
                     )
                 )
             for change in cast(list[dict[str, Any]], item.get("entity_changes", [])):
+                raw_entity_id = change.get("entity_id")
                 self._session.add(
                     EntityStateChangeModel(
                         work_id=work_id,
-                        entity_id=None,
+                        entity_id=UUID(str(raw_entity_id)) if raw_entity_id else None,
                         entity_name=str(change["entity_name"]),
                         field=str(change["field"]),
                         before=cast(dict[str, object], change.get("before", {})),
@@ -774,16 +775,13 @@ class SqlAlchemyMemoryRepository:
             stmt = stmt.where(KnowledgeStateModel.character_id == character_id)
         if at_chapter is not None:
             stmt = stmt.where(KnowledgeStateModel.chapter_number <= at_chapter)
-        stmt = (
-            stmt.order_by(
-                KnowledgeStateModel.chapter_number.desc(),
-                KnowledgeStateModel.created_at.desc(),
-            )
-            .limit(limit)
-            .offset(offset)
-        )
+        stmt = stmt.order_by(
+            KnowledgeStateModel.chapter_number.desc(),
+            KnowledgeStateModel.created_at.desc(),
+        ).limit(limit + offset)
         models = (await self._session.scalars(stmt)).all()
-        return _latest_knowledge(models)
+        latest = _latest_knowledge(models)
+        return latest[offset : offset + limit]
 
     async def who_knows(
         self,
@@ -799,18 +797,15 @@ class SqlAlchemyMemoryRepository:
         )
         if at_chapter is not None:
             stmt = stmt.where(KnowledgeStateModel.chapter_number <= at_chapter)
-        stmt = (
-            stmt.order_by(
-                KnowledgeStateModel.chapter_number.desc(),
-                KnowledgeStateModel.created_at.desc(),
-            )
-            .limit(limit)
-            .offset(offset)
-        )
+        stmt = stmt.order_by(
+            KnowledgeStateModel.chapter_number.desc(),
+            KnowledgeStateModel.created_at.desc(),
+        ).limit(limit + offset)
         models = (await self._session.scalars(stmt)).all()
-        return [
+        states = [
             state for state in _latest_knowledge(models) if state.state in {"knows", "suspects"}
         ]
+        return states[offset : offset + limit]
 
     async def list_relations(
         self, work_id: UUID, entity_id: UUID | None = None, limit: int = 100, offset: int = 0

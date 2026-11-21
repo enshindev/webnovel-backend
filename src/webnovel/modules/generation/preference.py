@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from webnovel.modules.generation.models import (
     CandidateSetModel,
     DraftModel,
+    GenerationModel,
     PreferenceEventModel,
 )
 from webnovel.modules.generation.service import _normalized_edit_distance
@@ -24,15 +25,29 @@ class SqlAlchemyPreferenceRecorder:
         draft = (
             await self._session.scalars(
                 select(DraftModel)
+                .join(GenerationModel, GenerationModel.id == DraftModel.generation_id)
                 .where(
                     DraftModel.chapter_id == chapter_id,
                     DraftModel.status == "accepted",
+                    GenerationModel.accepted_at.is_not(None),
                 )
-                .order_by(DraftModel.id.desc())
+                .order_by(GenerationModel.accepted_at.desc())
                 .limit(1)
             )
         ).first()
         if draft is None or draft.content == content:
+            return
+        distance = _normalized_edit_distance(draft.content[:4_000], content[:4_000])
+        existing = await self._session.scalar(
+            select(PreferenceEventModel.id)
+            .where(
+                PreferenceEventModel.candidate_id == str(draft.id),
+                PreferenceEventModel.event_type == "edited_after_accept",
+                PreferenceEventModel.edit_distance == distance,
+            )
+            .limit(1)
+        )
+        if existing is not None:
             return
         candidate_set = (
             await self._session.scalars(
@@ -48,7 +63,7 @@ class SqlAlchemyPreferenceRecorder:
                 candidate_set_id=candidate_set.id,
                 candidate_id=str(draft.id),
                 event_type="edited_after_accept",
-                edit_distance=_normalized_edit_distance(draft.content, content),
+                edit_distance=distance,
                 event_metadata={"chapter_id": str(chapter_id)},
             )
         )

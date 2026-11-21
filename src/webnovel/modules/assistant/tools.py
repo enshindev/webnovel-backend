@@ -48,9 +48,8 @@ class AssistantTools:
             return []
         return await self._retrieval.retrieve(work_id, query, limit=limit)
 
-    @staticmethod
-    def schemas() -> list[dict[str, object]]:
-        return [
+    def schemas(self) -> list[dict[str, object]]:
+        schemas: list[dict[str, object]] = [
             {
                 "type": "function",
                 "function": {
@@ -122,21 +121,6 @@ class AssistantTools:
             {
                 "type": "function",
                 "function": {
-                    "name": "search_library",
-                    "description": "检索作者资料库",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "query": {"type": "string"},
-                            "limit": {"type": "integer", "minimum": 1, "maximum": 10},
-                        },
-                        "required": ["query"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
                     "name": "get_timeline",
                     "description": "查作品时间线事件",
                     "parameters": {
@@ -166,6 +150,25 @@ class AssistantTools:
                 },
             },
         ]
+        if self._library is not None:
+            schemas.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "search_library",
+                        "description": "检索作者资料库",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "query": {"type": "string"},
+                                "limit": {"type": "integer", "minimum": 1, "maximum": 10},
+                            },
+                            "required": ["query"],
+                        },
+                    },
+                }
+            )
+        return schemas
 
     async def execute(self, name: str, work_id: UUID, arguments: str) -> ToolExecution:
         try:
@@ -259,7 +262,7 @@ class AssistantTools:
             if not query:
                 return ToolExecution(text="请提供检索词。")
             limit = max(1, min(int(args.get("limit", 5)), 10))
-            hits = await self._library.search(query, limit=limit)
+            hits = await self._library.search(query, limit=limit, work_id=work_id)
             if not hits:
                 return ToolExecution(text="资料库没有匹配内容。")
             return ToolExecution(
