@@ -69,6 +69,8 @@ class GenerationRepository(Protocol):
 
     async def record_regenerated(self, generation_id: UUID, source_generation_id: UUID) -> None: ...
 
+    async def delete_preferences(self, work_id: UUID) -> int: ...
+
 
 def _to_domain(model: GenerationModel) -> Generation:
     return Generation(
@@ -234,6 +236,19 @@ class SqlAlchemyGenerationRepository:
         )
         models = (await self._session.scalars(stmt)).all()
         return [_draft_to_domain(model) for model in models]
+
+    async def delete_preferences(self, work_id: UUID) -> int:
+        candidate_sets = (
+            select(CandidateSetModel.id)
+            .join(GenerationModel, GenerationModel.id == CandidateSetModel.generation_id)
+            .where(GenerationModel.work_id == work_id)
+        )
+        result = await self._session.execute(
+            delete(PreferenceEventModel).where(
+                PreferenceEventModel.candidate_set_id.in_(candidate_sets)
+            )
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
 
     async def record_regenerated(self, generation_id: UUID, source_generation_id: UUID) -> None:
         candidate_set = (

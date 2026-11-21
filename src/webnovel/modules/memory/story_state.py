@@ -15,9 +15,16 @@ def detect_contradictions(events: list[StoryEvent]) -> list[Contradiction]:
     entity_history: dict[tuple[str, str], str] = {}
     contradictions: list[Contradiction] = []
     by_chapter: dict[int, list[StoryEvent]] = defaultdict(list)
+    fact_first_mention: dict[str, int] = {}
     for event in events:
         by_chapter[event.chapter_number].append(event)
         changes = event.changes or {}
+        summary_lower = event.summary.casefold()
+        for item in changes.get("knowledge_changes", []) or []:
+            if isinstance(item, dict):
+                fact_key = str(item.get("fact_key", "")).casefold()
+                if fact_key and fact_key in summary_lower:
+                    fact_first_mention.setdefault(fact_key, event.chapter_number)
         for item in changes.get("knowledge_changes", []) or []:
             if not isinstance(item, dict):
                 continue
@@ -42,7 +49,7 @@ def detect_contradictions(events: list[StoryEvent]) -> list[Contradiction]:
             before = item.get("before")
             if isinstance(before, dict):
                 before = before.get("value")
-            if entity and field in {"location", "holder"} and after:
+            if entity and field in {"location", "holder", "relation", "status"} and after:
                 entity_states[(event.chapter_number, entity, field)].append(
                     {"after": str(after), "event_id": str(event.id), "summary": event.summary}
                 )
@@ -104,6 +111,24 @@ def detect_contradictions(events: list[StoryEvent]) -> list[Contradiction]:
                         ],
                     )
                 )
+    for (character, fact_key), history in knowledge_history.items():
+        earliest = fact_first_mention.get(fact_key.casefold())
+        if earliest is not None:
+            for chapter, state, event_id in history:
+                if state in {"knows", "suspects"} and earliest < chapter:
+                    contradictions.append(
+                        Contradiction(
+                            kind="knowledge.reveal_before_learn",
+                            severity="P2",
+                            message=(
+                                f"第 {chapter} 章：{character} 对「{fact_key}」"
+                                f"在正式获得前已在第 {earliest} 章被提及"
+                            ),
+                            chapter_number=chapter,
+                            evidence=[{"event_id": event_id, "first_mention": earliest}],
+                        )
+                    )
+                    break
     for (chapter, entity, field), states in entity_states.items():
         values = {item["after"] for item in states}
         if len(values) > 1:

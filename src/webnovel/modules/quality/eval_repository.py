@@ -100,6 +100,7 @@ def _run_info(row: EvalRunModel) -> EvalRunInfo:
         prompt_version=row.prompt_version,
         status=row.status,
         metrics=dict(row.metrics or {}),
+        params=dict(row.params or {}),
     )
 
 

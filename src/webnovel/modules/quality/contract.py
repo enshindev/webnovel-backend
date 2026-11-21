@@ -14,6 +14,7 @@ class EvalRunInfo:
     prompt_version: int | None
     status: str
     metrics: dict[str, Any]
+    params: dict[str, Any]
 
 
 @dataclass(frozen=True, slots=True)

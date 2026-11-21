@@ -177,6 +177,10 @@ class EntityStateChangeStatus(BaseModel):
     status: Literal["confirmed", "corrected", "dismissed"]
 
 
+class KnowledgeStatusUpdate(BaseModel):
+    status: Literal["confirmed", "corrected", "dismissed"]
+
+
 class RebuildResult(BaseModel):
     queued: int
     run_ids: list[UUID]
@@ -377,6 +381,20 @@ async def rebuild_story_state(
         )
         runs.append(run.id)
     return RebuildResult(queued=len(runs), run_ids=runs)
+
+
+@router.patch(
+    "/works/{work_id}/story-state/knowledge/{knowledge_id}",
+    response_model=KnowledgeStateOut,
+)
+async def update_knowledge(
+    work_id: UUID,
+    knowledge_id: UUID,
+    body: KnowledgeStatusUpdate,
+    service: MemoryServiceDep,
+) -> KnowledgeStateOut:
+    state = await service.update_knowledge_status(work_id, knowledge_id, body.status)
+    return KnowledgeStateOut.model_validate(state)
 
 
 @router.get("/works/{work_id}/story-state/relations", response_model=EntityRelationList)

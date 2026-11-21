@@ -213,6 +213,7 @@ def prompt_promote(
     dry_run: bool = False,
     min_pass_rate: float = 0.0,
     max_latency_ms: float | None = None,
+    require_full: bool = typer.Option(True, "--require-full/--no-require-full"),
 ) -> None:
     """跑过评测后把 label 指向新 prompt 版本。"""
     import asyncio
@@ -266,6 +267,11 @@ def prompt_promote(
             typer.echo(
                 f"eval gate is not passed (status={run.status}, metrics={metrics})",
                 err=True,
+            )
+            raise typer.Exit(code=1)
+        if require_full and run.params.get("suite") != "full":
+            typer.echo(
+                "eval run is not a full-suite run; use --no-require-full to override", err=True
             )
             raise typer.Exit(code=1)
         if run.prompt_name != prompt_id or run.prompt_version != version:

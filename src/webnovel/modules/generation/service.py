@@ -130,6 +130,9 @@ class GenerationsService:
         await self.get(generation_id)
         return await self._repository.list_drafts(generation_id)
 
+    async def clear_preferences(self, work_id: UUID) -> int:
+        return int(await self._repository.delete_preferences(work_id))
+
     async def retry(self, generation_id: UUID) -> Generation:
         original = await self.get(generation_id)
         if original.status not in {

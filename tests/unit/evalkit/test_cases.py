@@ -11,9 +11,9 @@ ROOT = Path(__file__).resolve().parents[3]
 
 def test_loads_smoke_cases_from_real_evals() -> None:
     cases = load_cases(ROOT / "evals", suite="smoke")
-    assert len(cases) == 29
+    assert len(cases) == 19
     assert all("smoke" in case.spec.tags for case in cases)
-    assert len({case.spec.id for case in cases}) == 29
+    assert len({case.spec.id for case in cases}) == 19
 
 
 def test_full_suite_includes_everything() -> None:

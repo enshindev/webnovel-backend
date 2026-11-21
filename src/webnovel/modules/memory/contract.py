@@ -280,6 +280,10 @@ class MemoryService(Protocol):
         self, work_id: UUID, change_id: UUID, status: str
     ) -> EntityStateChange: ...
 
+    async def update_knowledge_status(
+        self, work_id: UUID, knowledge_id: UUID, status: str
+    ) -> KnowledgeState: ...
+
     async def create_foreshadow(
         self,
         work_id: UUID,

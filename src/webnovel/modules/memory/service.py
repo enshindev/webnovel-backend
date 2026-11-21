@@ -179,6 +179,22 @@ class MemoryServiceImpl(MemoryService):
             offset=offset,
         )
 
+    async def update_knowledge_status(
+        self, work_id: UUID, knowledge_id: UUID, status: str
+    ) -> KnowledgeState:
+        if status not in {"confirmed", "corrected", "dismissed"}:
+            raise ValidationError(
+                f"invalid knowledge status: {status}",
+                code="story_state.invalid_knowledge_status",
+            )
+        knowledge = await self._repository.update_knowledge_status(work_id, knowledge_id, status)
+        if knowledge is None:
+            raise NotFoundError(
+                f"knowledge state not found: {knowledge_id}",
+                code="story_state.knowledge_not_found",
+            )
+        return knowledge
+
     async def update_entity_change_status(
         self, work_id: UUID, change_id: UUID, status: str
     ) -> EntityStateChange:

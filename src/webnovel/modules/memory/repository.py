@@ -184,6 +184,10 @@ class MemoryRepository(Protocol):
         self, work_id: UUID, change_id: UUID, status: str
     ) -> EntityStateChange | None: ...
 
+    async def update_knowledge_status(
+        self, work_id: UUID, knowledge_id: UUID, status: str
+    ) -> KnowledgeState | None: ...
+
     async def add_foreshadow(
         self,
         work_id: UUID,
@@ -847,6 +851,16 @@ class SqlAlchemyMemoryRepository:
         )
         models = (await self._session.scalars(stmt)).all()
         return [_entity_change_to_domain(model) for model in models]
+
+    async def update_knowledge_status(
+        self, work_id: UUID, knowledge_id: UUID, status: str
+    ) -> KnowledgeState | None:
+        model = await self._session.get(KnowledgeStateModel, knowledge_id)
+        if model is None or model.work_id != work_id:
+            return None
+        model.status = status
+        await self._session.flush()
+        return _knowledge_to_domain(model)
 
     async def update_entity_change_status(
         self, work_id: UUID, change_id: UUID, status: str

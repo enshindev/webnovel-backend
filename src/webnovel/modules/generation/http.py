@@ -127,6 +127,11 @@ async def get_generation_prompt(
     }
 
 
+@router.delete("/works/{work_id}/preferences")
+async def clear_preferences(work_id: UUID, service: GenerationServiceDep) -> dict[str, int]:
+    return {"deleted": await service.clear_preferences(work_id)}
+
+
 @router.post(
     "/generations/{generation_id}/retry",
     response_model=GenerationOut,
