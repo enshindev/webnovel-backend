@@ -31,6 +31,37 @@ class OutlineDraftOut(BaseModel):
     content: dict[str, Any]
 
 
+class ChapterAnalysisOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    run_id: UUID
+    chapter_id: UUID
+    version_id: UUID | None
+    summary: str
+    beats: list[dict[str, Any]]
+    pov: str | None
+    time_text: str | None
+    characters: list[str]
+    hook: str | None
+    hook_type: str | None
+    issues: list[dict[str, Any]]
+    status: str
+    progress: int
+    boundary_confidence: float | None
+
+
+class ChapterAnalysisPatch(BaseModel):
+    summary: str | None = None
+    beats: list[dict[str, Any]] | None = None
+    pov: str | None = None
+    time_text: str | None = None
+    characters: list[str] | None = None
+    hook: str | None = None
+    hook_type: str | None = None
+    boundary_confidence: float | None = None
+
+
 class AnalysisRunOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -85,6 +116,45 @@ async def list_analysis_runs(
 @router.get("/analysis/runs/{run_id}", response_model=AnalysisRunOut)
 async def get_analysis_run(run_id: UUID, service: AnalysisServiceDep) -> AnalysisRunOut:
     return AnalysisRunOut.model_validate(await service.get(run_id))
+
+
+@router.get(
+    "/analysis/runs/{run_id}/chapters",
+    response_model=list[ChapterAnalysisOut],
+)
+async def list_analysis_chapters(
+    run_id: UUID, service: AnalysisServiceDep
+) -> list[ChapterAnalysisOut]:
+    return [
+        ChapterAnalysisOut.model_validate(chapter)
+        for chapter in await service.list_chapters(run_id)
+    ]
+
+
+@router.patch(
+    "/analysis/runs/{run_id}/chapters/{chapter_id}",
+    response_model=ChapterAnalysisOut,
+)
+async def update_analysis_chapter(
+    run_id: UUID,
+    chapter_id: UUID,
+    body: ChapterAnalysisPatch,
+    service: AnalysisServiceDep,
+) -> ChapterAnalysisOut:
+    values = body.model_dump(exclude_none=True)
+    return ChapterAnalysisOut.model_validate(
+        await service.update_chapter(run_id, chapter_id, values)
+    )
+
+
+@router.post(
+    "/analysis/runs/{run_id}/chapters/{chapter_id}/retry",
+    response_model=ChapterAnalysisOut,
+)
+async def retry_analysis_chapter(
+    run_id: UUID, chapter_id: UUID, service: AnalysisServiceDep
+) -> ChapterAnalysisOut:
+    return ChapterAnalysisOut.model_validate(await service.retry_chapter(run_id, chapter_id))
 
 
 @router.get("/analysis/runs/{run_id}/outline", response_model=OutlineDraftOut)

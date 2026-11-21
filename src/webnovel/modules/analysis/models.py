@@ -42,6 +42,9 @@ class ChapterAnalysisModel(UUIDPrimaryKeyMixin, Base):
     hook: Mapped[str | None] = mapped_column(Text, nullable=True)
     hook_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     issues: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String(16), default="ready")
+    progress: Mapped[int] = mapped_column(default=100)
+    boundary_confidence: Mapped[float | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -27,6 +27,25 @@ class AnalysisRun:
     created_at: datetime
 
 
+@dataclass(frozen=True, slots=True)
+class ChapterAnalysis:
+    id: UUID
+    run_id: UUID
+    chapter_id: UUID
+    version_id: UUID | None
+    summary: str
+    beats: list[dict[str, Any]]
+    pov: str | None
+    time_text: str | None
+    characters: list[str]
+    hook: str | None
+    hook_type: str | None
+    issues: list[dict[str, Any]]
+    status: str
+    progress: int
+    boundary_confidence: float | None
+
+
 class AnalysisService(Protocol):
     async def start_reverse_outline(
         self, work_id: UUID, chapter_range: dict[str, int] | None = None
@@ -45,3 +64,11 @@ class AnalysisService(Protocol):
     async def update_outline(
         self, run_id: UUID, content: dict[str, Any], status: str | None = None
     ) -> OutlineDraft: ...
+
+    async def list_chapters(self, run_id: UUID) -> list[ChapterAnalysis]: ...
+
+    async def update_chapter(
+        self, run_id: UUID, chapter_id: UUID, values: dict[str, Any]
+    ) -> ChapterAnalysis: ...
+
+    async def retry_chapter(self, run_id: UUID, chapter_id: UUID) -> ChapterAnalysis: ...

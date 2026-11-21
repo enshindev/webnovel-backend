@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from webnovel.modules.analysis.contract import AnalysisRun, OutlineDraft
+from webnovel.modules.analysis.contract import AnalysisRun, ChapterAnalysis, OutlineDraft
 from webnovel.modules.analysis.models import (
     AnalysisRunModel,
     ChapterAnalysisModel,
@@ -40,6 +40,34 @@ class AnalysisRepository(Protocol):
     async def update_outline(
         self, run_id: UUID, content: dict[str, Any], status: str | None
     ) -> OutlineDraft | None: ...
+
+    async def list_chapters(self, run_id: UUID) -> list[ChapterAnalysis]: ...
+
+    async def get_chapter(self, run_id: UUID, chapter_id: UUID) -> ChapterAnalysis | None: ...
+
+    async def update_chapter(
+        self, run_id: UUID, chapter_id: UUID, values: dict[str, Any]
+    ) -> ChapterAnalysis | None: ...
+
+
+def _chapter(model: ChapterAnalysisModel) -> ChapterAnalysis:
+    return ChapterAnalysis(
+        id=model.id,
+        run_id=model.run_id,
+        chapter_id=model.chapter_id,
+        version_id=model.version_id,
+        summary=model.summary,
+        beats=list(model.beats),
+        pov=model.pov,
+        time_text=model.time_text,
+        characters=list(model.characters),
+        hook=model.hook,
+        hook_type=model.hook_type,
+        issues=list(model.issues),
+        status=model.status,
+        progress=model.progress,
+        boundary_confidence=model.boundary_confidence,
+    )
 
 
 def _run(model: AnalysisRunModel) -> AnalysisRun:
@@ -109,6 +137,50 @@ class SqlAlchemyAnalysisRepository:
     async def add_chapter(self, run_id: UUID, data: dict[str, Any]) -> None:
         self._session.add(ChapterAnalysisModel(run_id=run_id, **data))
         await self._session.flush()
+
+    async def list_chapters(self, run_id: UUID) -> list[ChapterAnalysis]:
+        rows = (
+            (
+                await self._session.execute(
+                    select(ChapterAnalysisModel)
+                    .where(ChapterAnalysisModel.run_id == run_id)
+                    .order_by(ChapterAnalysisModel.created_at)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return [_chapter(row) for row in rows]
+
+    async def get_chapter(self, run_id: UUID, chapter_id: UUID) -> ChapterAnalysis | None:
+        row = (
+            await self._session.execute(
+                select(ChapterAnalysisModel).where(
+                    ChapterAnalysisModel.run_id == run_id,
+                    ChapterAnalysisModel.chapter_id == chapter_id,
+                )
+            )
+        ).scalar_one_or_none()
+        return _chapter(row) if row is not None else None
+
+    async def update_chapter(
+        self, run_id: UUID, chapter_id: UUID, values: dict[str, Any]
+    ) -> ChapterAnalysis | None:
+        row = (
+            await self._session.execute(
+                select(ChapterAnalysisModel).where(
+                    ChapterAnalysisModel.run_id == run_id,
+                    ChapterAnalysisModel.chapter_id == chapter_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            return None
+        for key, value in values.items():
+            if hasattr(row, key):
+                setattr(row, key, value)
+        await self._session.flush()
+        return _chapter(row)
 
     async def get_outline(self, run_id: UUID) -> OutlineDraft | None:
         row = (

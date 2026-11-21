@@ -5,7 +5,12 @@ from typing import Any
 from uuid import UUID
 
 from webnovel.kernel.errors import NotFoundError, ValidationError
-from webnovel.modules.analysis.contract import AnalysisRun, AnalysisService, OutlineDraft
+from webnovel.modules.analysis.contract import (
+    AnalysisRun,
+    AnalysisService,
+    ChapterAnalysis,
+    OutlineDraft,
+)
 from webnovel.modules.analysis.importing import parse_manuscript, split_chapters
 from webnovel.modules.analysis.repository import AnalysisRepository
 from webnovel.modules.chapters_versions.contract import ChapterService
@@ -81,6 +86,40 @@ class AnalysisServiceImpl(AnalysisService):
 
     async def apply(self, run_id: UUID) -> OutlineDraft:
         return await self.get_outline(run_id)
+
+    async def list_chapters(self, run_id: UUID) -> list[ChapterAnalysis]:
+        await self.get(run_id)
+        return await self._repository.list_chapters(run_id)
+
+    async def update_chapter(
+        self, run_id: UUID, chapter_id: UUID, values: dict[str, Any]
+    ) -> ChapterAnalysis:
+        await self.get(run_id)
+        allowed = {
+            "summary",
+            "beats",
+            "pov",
+            "time_text",
+            "characters",
+            "hook",
+            "hook_type",
+            "boundary_confidence",
+            "status",
+            "progress",
+        }
+        filtered = {key: value for key, value in values.items() if key in allowed}
+        chapter = await self._repository.update_chapter(run_id, chapter_id, filtered)
+        if chapter is None:
+            raise NotFoundError(
+                f"chapter analysis not found: {chapter_id}", code="analysis.chapter_not_found"
+            )
+        return chapter
+
+    async def retry_chapter(self, run_id: UUID, chapter_id: UUID) -> ChapterAnalysis:
+        chapter = await self.update_chapter(
+            run_id, chapter_id, {"status": "pending", "progress": 0}
+        )
+        return chapter
 
     async def update_outline(
         self, run_id: UUID, content: dict[str, Any], status: str | None = None
