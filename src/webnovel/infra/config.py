@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_model: str = ""
     llm_provider: str = "openai-compatible"
+    local_llm_base_url: str = ""
+    local_llm_api_key: str = ""
+    local_llm_model: str = ""
     daily_budget: float | None = None
     assistant_enabled: bool = True
     story_state_contradictions_in_quality: bool = False

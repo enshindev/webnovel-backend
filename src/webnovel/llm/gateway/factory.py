@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-import os
-from pathlib import Path
-
 import yaml
-from dotenv import dotenv_values
 from pydantic import ValidationError
 
 from webnovel.infra.config import Settings
@@ -16,25 +12,9 @@ from webnovel.llm.gateway.routing import load_routing
 
 
 def _routing_variables(settings: Settings) -> dict[str, str]:
-    values: dict[str, str] = {}
-    env_file = Path(".env")
-    if env_file.is_file():
-        values.update(
-            {key: value for key, value in dotenv_values(env_file).items() if value is not None}
-        )
-    values.update(os.environ)
-    values.update(
-        {
-            key: value
-            for key, value in {
-                "LLM_BASE_URL": settings.llm_base_url,
-                "LLM_API_KEY": settings.llm_api_key,
-                "LLM_MODEL": settings.llm_model,
-            }.items()
-            if value
-        }
-    )
-    return values
+    from webnovel.llm.gateway.settings_vars import routing_variables
+
+    return routing_variables(settings)
 
 
 def _targets(settings: Settings, profile: str) -> list[ProviderTarget]:

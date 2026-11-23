@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 import base64
-import os
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, cast
 
 import httpx
 import yaml
-from dotenv import dotenv_values
 from pydantic import ValidationError
 
 from webnovel.infra.config import Settings
@@ -29,27 +26,9 @@ def _raise_gateway_error(exc: httpx.HTTPError) -> None:
 
 
 def _variables(settings: Settings) -> dict[str, str]:
-    values: dict[str, str] = {}
-    env_file = Path(".env")
-    if env_file.is_file():
-        values.update(
-            {key: value for key, value in dotenv_values(env_file).items() if value is not None}
-        )
-    values.update(os.environ)
-    values.update(
-        {
-            "ASR_BASE_URL": settings.asr_base_url,
-            "ASR_API_KEY": settings.asr_api_key,
-            "ASR_MODEL": settings.asr_model,
-            "TTS_BASE_URL": settings.tts_base_url,
-            "TTS_API_KEY": settings.tts_api_key,
-            "TTS_MODEL": settings.tts_model,
-            "IMAGE_BASE_URL": settings.image_base_url,
-            "IMAGE_API_KEY": settings.image_api_key,
-            "IMAGE_MODEL": settings.image_model,
-        }
-    )
-    return {key: value for key, value in values.items() if value}
+    from webnovel.llm.gateway.settings_vars import routing_variables
+
+    return routing_variables(settings)
 
 
 @dataclass(frozen=True, slots=True)
