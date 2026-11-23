@@ -29,6 +29,7 @@ class ExportServiceImpl(ExportService):
         outbox: OutboxService | None = None,
         speech: SpeechProvider | None = None,
         cover: CoverProvider | None = None,
+        experiments_enabled: bool = True,
     ) -> None:
         self._repository = repository
         self._chapter_service = chapter_service
@@ -39,10 +40,16 @@ class ExportServiceImpl(ExportService):
         self._outbox = outbox
         self._speech = speech
         self._cover = cover
+        self._experiments_enabled = experiments_enabled
 
     async def create(self, work_id: UUID, fmt: str) -> ExportJob:
         if fmt not in {"txt", "docx", "mp3", "cover"}:
             raise ValidationError("unsupported export format", code="export.unsupported_format")
+        if fmt in {"mp3", "cover"} and not self._experiments_enabled:
+            raise ValidationError(
+                "mp3/cover export requires ENABLE_EXPERIMENTS=true",
+                code="export.experiment_disabled",
+            )
         if fmt == "mp3" and self._speech is None:
             raise UnavailableError(
                 "mp3 export requires TTS configuration", code="export.tts_unavailable"

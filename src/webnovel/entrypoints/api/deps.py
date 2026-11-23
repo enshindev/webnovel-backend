@@ -142,6 +142,7 @@ def get_library_service(session: SessionDep, settings: SettingsDep) -> LibrarySe
         usage,
         build_reranker(settings),
         build_transcription_provider(settings),
+        settings.enable_experiments,
     )
 
 

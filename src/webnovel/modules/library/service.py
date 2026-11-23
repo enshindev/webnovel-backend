@@ -31,6 +31,7 @@ class LibraryServiceImpl(LibraryService):
         usage: UsageService | None = None,
         reranker: Reranker | None = None,
         transcriber: TranscriptionProvider | None = None,
+        experiments_enabled: bool = True,
     ) -> None:
         self._repository = repository
         self._settings = settings
@@ -38,6 +39,7 @@ class LibraryServiceImpl(LibraryService):
         self._usage = usage
         self._reranker = reranker
         self._transcriber = transcriber
+        self._experiments_enabled = experiments_enabled
 
     async def create_collection(
         self, name: str, description: str | None, work_id: UUID | None
@@ -142,6 +144,11 @@ class LibraryServiceImpl(LibraryService):
 
     async def _extract_text(self, filename: str, suffix: str, data: bytes) -> str:
         if suffix in _AUDIO_SUFFIXES:
+            if not self._experiments_enabled:
+                raise ValidationError(
+                    "audio import requires ENABLE_EXPERIMENTS=true",
+                    code="library.audio_experiment_disabled",
+                )
             if self._transcriber is None:
                 raise UnavailableError(
                     "audio import requires ASR configuration", code="library.asr_unavailable"
