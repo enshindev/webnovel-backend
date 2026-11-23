@@ -7,6 +7,29 @@ from typing import Protocol
 from uuid import UUID
 
 
+async def record_media_usage(
+    usage: UsageService | None,
+    *,
+    work_id: UUID | None,
+    task: str,
+    model: str,
+    prompt_units: int,
+    output_units: int,
+) -> None:
+    if usage is None:
+        return
+    await usage.record_llm(
+        work_id=work_id,
+        generation_id=None,
+        provider="multimodal",
+        model=model or "multimodal",
+        task_type=task,
+        prompt_tokens=max(1, prompt_units // 4),
+        completion_tokens=max(1, output_units // 4),
+        estimated=True,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class UsageEntry:
     id: int

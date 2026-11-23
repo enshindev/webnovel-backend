@@ -9,7 +9,7 @@ from webnovel.modules.multimodal.contract import (
     SpeechProvider,
     TranscriptionProvider,
 )
-from webnovel.modules.usage.contract import UsageService
+from webnovel.modules.usage.contract import UsageService, record_media_usage
 
 
 class MultimodalService:
@@ -70,15 +70,11 @@ class MultimodalService:
         output_units: int,
         provider: object,
     ) -> None:
-        if self._usage is None:
-            return
-        await self._usage.record_llm(
+        await record_media_usage(
+            self._usage,
             work_id=work_id,
-            generation_id=None,
-            provider="multimodal",
+            task=task,
             model=str(getattr(provider, "model", "multimodal") or "multimodal"),
-            task_type=task,
-            prompt_tokens=max(1, prompt_units // 4),
-            completion_tokens=max(1, output_units // 4),
-            estimated=True,
+            prompt_units=prompt_units,
+            output_units=output_units,
         )

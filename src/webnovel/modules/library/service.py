@@ -16,7 +16,7 @@ from webnovel.llm.retrieval.bm25 import BM25Index
 from webnovel.modules.library.contract import LibraryCollection, LibraryDocument, LibraryService
 from webnovel.modules.library.repository import LibraryRepository
 from webnovel.modules.multimodal.contract import TranscriptionProvider
-from webnovel.modules.usage.contract import UsageService
+from webnovel.modules.usage.contract import UsageService, record_media_usage
 
 _OCR_ENGINE: Any | None = None
 _AUDIO_SUFFIXES = {"mp3", "wav", "m4a", "ogg", "webm", "flac"}
@@ -155,17 +155,14 @@ class LibraryServiceImpl(LibraryService):
                 )
             content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
             text = await self._transcriber.transcribe(filename, content_type, data)
-            if self._usage is not None:
-                await self._usage.record_llm(
-                    work_id=None,
-                    generation_id=None,
-                    provider="multimodal",
-                    model=str(getattr(self._transcriber, "model", "multimodal") or "multimodal"),
-                    task_type="asr",
-                    prompt_tokens=max(1, len(data) // 4),
-                    completion_tokens=max(1, len(text) // 4),
-                    estimated=True,
-                )
+            await record_media_usage(
+                self._usage,
+                work_id=None,
+                task="asr",
+                model=str(getattr(self._transcriber, "model", "multimodal") or "multimodal"),
+                prompt_units=len(data),
+                output_units=len(text),
+            )
             return text
         return _parse_text(data, suffix)
 
