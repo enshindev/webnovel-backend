@@ -47,6 +47,8 @@ class GenerationRepository(Protocol):
 
     async def claim(self, generation_id: UUID) -> Generation | None: ...
 
+    async def reset_for_retry(self, generation_id: UUID) -> Generation | None: ...
+
     async def mark_streaming(self, generation_id: UUID) -> None: ...
 
     async def append_draft(self, draft_id: UUID, text: str) -> None: ...
@@ -314,6 +316,38 @@ class SqlAlchemyGenerationRepository:
         await self._session.flush()
         await self._session.refresh(model)
         return _draft_to_domain(model)
+
+    async def reset_for_retry(self, generation_id: UUID) -> Generation | None:
+        model = await self._session.get(GenerationModel, generation_id)
+        if model is None:
+            return None
+        model.status = GenerationStatus.QUEUED.value
+        model.accepted_at = None
+        drafts = (
+            await self._session.scalars(
+                select(DraftModel).where(DraftModel.generation_id == generation_id)
+            )
+        ).all()
+        for draft in drafts:
+            draft.content = ""
+            draft.status = DraftStatus.GENERATING.value
+        candidate_set = (
+            await self._session.scalars(
+                select(CandidateSetModel).where(CandidateSetModel.generation_id == generation_id)
+            )
+        ).first()
+        if candidate_set is not None:
+            self._session.add(
+                PreferenceEventModel(
+                    candidate_set_id=candidate_set.id,
+                    candidate_id=str(model.draft_id or model.id),
+                    event_type="regenerated",
+                    event_metadata={"retry_same_set": True},
+                )
+            )
+        await self._session.flush()
+        await self._session.refresh(model)
+        return _to_domain(model)
 
     async def claim(self, generation_id: UUID) -> Generation | None:
         stmt = select(GenerationModel).where(GenerationModel.id == generation_id).with_for_update()

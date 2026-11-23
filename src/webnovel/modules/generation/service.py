@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Awaitable, Callable
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import structlog
 
@@ -144,17 +144,13 @@ class GenerationsService:
                 f"generation is not retryable: {original.status}",
                 code="generation.not_retryable",
             )
-        previous = await self._repository.list_drafts(original.id)
-        command = GenerationCreate(
-            work_id=original.work_id,
-            chapter_id=original.chapter_id,
-            task_type=original.task_type,
-            instruction=original.instruction,
-            target_words=original.target_words,
-            candidate_count=max(1, min(MAX_CANDIDATE_COUNT, len(previous))),
-        )
-        retried = await self.create(command, f"retry:{generation_id.hex[:16]}:{uuid4().hex[:16]}")
-        await self._repository.record_regenerated(retried.id, original.id)
+        retried = await self._repository.reset_for_retry(original.id)
+        if retried is None:
+            raise NotFoundError(
+                f"generation not found: {generation_id}", code="generation.not_found"
+            )
+        if self._enqueue is not None:
+            await self._enqueue(retried.id)
         return retried
 
     async def discard_draft(self, draft_id: UUID) -> Draft:

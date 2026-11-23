@@ -62,6 +62,9 @@ class AnalysisRunner:
                     chapter.id, chapter.current_version_id
                 )
                 extracted = await self._extract(version.content)
+                extracted["boundary_confidence"] = 0.8 if extracted.get("beats") else 0.4
+                extracted["status"] = "needs_review" if extracted.get("issues") else "ready"
+                extracted["progress"] = 100
                 await self._repository.add_chapter(
                     run.id,
                     {
