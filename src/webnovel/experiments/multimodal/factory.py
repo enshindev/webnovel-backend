@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from webnovel.infra.config import Settings
 from webnovel.llm.gateway.media import MediaGateway, build_media_gateway
-from webnovel.modules.multimodal.service import MultimodalService
+from webnovel.experiments.multimodal.service import MultimodalService
 from webnovel.modules.usage.contract import UsageService
 
 

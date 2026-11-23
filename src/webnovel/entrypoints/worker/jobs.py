@@ -4,6 +4,11 @@ from uuid import UUID
 
 import structlog
 
+from webnovel.experiments.multimodal.factory import (
+    build_cover_provider,
+    build_speech_provider,
+    build_transcription_provider,
+)
 from webnovel.infra.config import get_settings
 from webnovel.infra.db.session import session_factory
 from webnovel.infra.queue import ArqExtractionQueue
@@ -41,11 +46,6 @@ from webnovel.modules.memory.extraction import ExtractionRunner
 from webnovel.modules.memory.repository import SqlAlchemyMemoryRepository
 from webnovel.modules.memory.retrieval import MemoryVectorService
 from webnovel.modules.memory.service import MemoryServiceImpl
-from webnovel.modules.multimodal.factory import (
-    build_cover_provider,
-    build_speech_provider,
-    build_transcription_provider,
-)
 from webnovel.modules.outbox.dispatcher import dispatch_once
 from webnovel.modules.quality.repository import SqlAlchemyQualityRepository
 from webnovel.modules.quality.review import QualityReviewRunner

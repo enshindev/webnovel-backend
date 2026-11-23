@@ -129,7 +129,7 @@ def get_audit_service(session: SessionDep) -> AuditService:
 
 
 def get_library_service(session: SessionDep, settings: SettingsDep) -> LibraryService:
-    from webnovel.modules.multimodal.factory import build_transcription_provider
+    from webnovel.experiments.multimodal.factory import build_transcription_provider
 
     embedding_client = build_embedding_client(settings)
     usage = UsageServiceImpl(
@@ -253,7 +253,7 @@ def get_memory_service(session: SessionDep, settings: SettingsDep) -> MemoryServ
 
 
 def get_multimodal_service(session: SessionDep, settings: SettingsDep) -> Any:
-    from webnovel.modules.multimodal.factory import build_multimodal_service
+    from webnovel.experiments.multimodal.factory import build_multimodal_service
 
     usage = UsageServiceImpl(
         SqlAlchemyUsageRepository(session), load_pricing(settings.pricing_config_path)
@@ -264,7 +264,7 @@ def get_multimodal_service(session: SessionDep, settings: SettingsDep) -> Any:
 def get_graphrag_service(
     memory: Annotated[MemoryService, Depends(get_memory_service)],
 ) -> Any:
-    from webnovel.modules.graphrag.service import GraphRagService
+    from webnovel.experiments.graphrag.service import GraphRagService
 
     return GraphRagService(memory)
 
@@ -296,7 +296,7 @@ def get_assistant_service(
         if embedding_client is not None
         else None
     )
-    from webnovel.modules.multimodal.factory import build_transcription_provider
+    from webnovel.experiments.multimodal.factory import build_transcription_provider
 
     tools = AssistantTools(
         retrieval=retrieval,
@@ -411,7 +411,7 @@ def get_export_service(
     outbox: Annotated[OutboxService, Depends(get_outbox_service)],
     settings: SettingsDep,
 ) -> ExportService:
-    from webnovel.modules.multimodal.factory import (
+    from webnovel.experiments.multimodal.factory import (
         build_cover_provider,
         build_speech_provider,
     )

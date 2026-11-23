@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from webnovel.kernel.errors import NotFoundError, ValidationError
-from webnovel.modules.graphrag.contract import GraphEdge, GraphEvent, GraphNode, GraphSubgraph
+from webnovel.experiments.graphrag.contract import GraphEdge, GraphEvent, GraphNode, GraphSubgraph
 from webnovel.modules.memory.contract import Entity, EntityRelation, MemoryService, StoryEvent
 
 

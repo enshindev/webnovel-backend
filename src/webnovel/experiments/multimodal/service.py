@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from webnovel.kernel.errors import UnavailableError
-from webnovel.modules.multimodal.contract import (
+from webnovel.experiments.multimodal.contract import (
     CoverProvider,
     MultimodalStatus,
     SpeechProvider,

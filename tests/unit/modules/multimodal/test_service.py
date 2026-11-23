@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
+from webnovel.experiments.multimodal.contract import MultimodalStatus
+from webnovel.experiments.multimodal.service import MultimodalService
 from webnovel.kernel.errors import UnavailableError
-from webnovel.modules.multimodal.contract import MultimodalStatus
-from webnovel.modules.multimodal.service import MultimodalService
 
 
 class FakeASR:

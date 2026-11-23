@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
+from webnovel.experiments.multimodal.contract import TranscriptionProvider
 from webnovel.infra.config import Settings
 from webnovel.kernel.errors import NotFoundError, UnavailableError, ValidationError
 from webnovel.kernel.ports.embeddings import EmbeddingClient
@@ -15,7 +16,6 @@ from webnovel.kernel.ports.rerank import Reranker
 from webnovel.llm.retrieval.bm25 import BM25Index
 from webnovel.modules.library.contract import LibraryCollection, LibraryDocument, LibraryService
 from webnovel.modules.library.repository import LibraryRepository
-from webnovel.modules.multimodal.contract import TranscriptionProvider
 from webnovel.modules.usage.contract import UsageService, record_media_usage
 
 _OCR_ENGINE: Any | None = None

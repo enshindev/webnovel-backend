@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from webnovel.entrypoints.api.deps import MultimodalServiceDep
 from webnovel.kernel.errors import ValidationError
-from webnovel.modules.multimodal.contract import MultimodalStatus
+from webnovel.experiments.multimodal.contract import MultimodalStatus
 
 router = APIRouter(prefix="/experiments/multimodal", tags=["multimodal"])
 

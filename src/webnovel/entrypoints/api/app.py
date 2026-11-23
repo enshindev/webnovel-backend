@@ -95,14 +95,14 @@ def create_app() -> FastAPI:
     app.include_router(style_router, prefix=API_PREFIX)
     app.include_router(memory_router, prefix=API_PREFIX)
     if settings.enable_experiments:
-        from webnovel.modules.multimodal.http import router as multimodal_router
+        from webnovel.experiments.multimodal.http import router as multimodal_router
 
         app.include_router(multimodal_router, prefix=API_PREFIX)
     app.include_router(prompts_router, prefix=API_PREFIX)
     app.include_router(quality_router, prefix=API_PREFIX)
     app.include_router(export_router, prefix=API_PREFIX)
     if settings.enable_experiments:
-        from webnovel.modules.graphrag.http import router as graphrag_router
+        from webnovel.experiments.graphrag.http import router as graphrag_router
 
         app.include_router(graphrag_router, prefix=API_PREFIX)
     app.include_router(library_router, prefix=API_PREFIX)

@@ -4,8 +4,8 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from webnovel.experiments.graphrag.service import GraphRagService
 from webnovel.kernel.errors import NotFoundError, ValidationError
-from webnovel.modules.graphrag.service import GraphRagService
 from webnovel.modules.memory.contract import (
     Entity,
     EntityRelation,
