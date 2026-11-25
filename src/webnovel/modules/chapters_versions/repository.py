@@ -46,6 +46,8 @@ class ChapterRepository(Protocol):
 
     async def set_volume(self, chapter_id: UUID, volume_id: UUID | None) -> Chapter | None: ...
 
+    async def shift_numbers(self, work_id: UUID, from_number: int, delta: int) -> None: ...
+
 
 def _to_domain(model: ChapterModel) -> Chapter:
     return Chapter(
@@ -179,6 +181,18 @@ class SqlAlchemyChapterRepository:
         )
         rows = (await self._session.execute(stmt)).scalars().all()
         return [_version_to_domain(row) for row in rows]
+
+    async def shift_numbers(self, work_id: UUID, from_number: int, delta: int) -> None:
+        rows = (
+            await self._session.scalars(
+                select(ChapterModel)
+                .where(ChapterModel.work_id == work_id, ChapterModel.number >= from_number)
+                .order_by(ChapterModel.number.desc())
+            )
+        ).all()
+        for row in rows:
+            row.number += delta
+        await self._session.flush()
 
     async def set_volume(self, chapter_id: UUID, volume_id: UUID | None) -> Chapter | None:
         model = await self._session.get(ChapterModel, chapter_id)

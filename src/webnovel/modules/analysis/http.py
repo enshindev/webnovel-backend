@@ -51,6 +51,10 @@ class ChapterAnalysisOut(BaseModel):
     boundary_confidence: float | None
 
 
+class SplitChapterBody(BaseModel):
+    offset: int
+
+
 class ChapterAnalysisPatch(BaseModel):
     summary: str | None = None
     beats: list[dict[str, Any]] | None = None
@@ -155,6 +159,20 @@ async def retry_analysis_chapter(
     run_id: UUID, chapter_id: UUID, service: AnalysisServiceDep
 ) -> ChapterAnalysisOut:
     return ChapterAnalysisOut.model_validate(await service.retry_chapter(run_id, chapter_id))
+
+
+@router.post(
+    "/analysis/runs/{run_id}/chapters/{chapter_id}/split",
+    response_model=list[dict[str, str]],
+)
+async def split_analysis_chapter(
+    run_id: UUID, chapter_id: UUID, body: SplitChapterBody, service: AnalysisServiceDep
+) -> list[dict[str, str]]:
+    result = await service.split_chapter(run_id, chapter_id, body.offset)
+    return [
+        {"id": str(result.first.id), "title": result.first.title},
+        {"id": str(result.second.id), "title": result.second.title},
+    ]
 
 
 @router.get("/analysis/runs/{run_id}/outline", response_model=OutlineDraftOut)

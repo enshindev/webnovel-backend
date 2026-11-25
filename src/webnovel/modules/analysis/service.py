@@ -10,6 +10,7 @@ from webnovel.modules.analysis.contract import (
     AnalysisService,
     ChapterAnalysis,
     OutlineDraft,
+    SplitChapterResult,
 )
 from webnovel.modules.analysis.importing import parse_manuscript, split_chapters
 from webnovel.modules.analysis.repository import AnalysisRepository
@@ -114,6 +115,13 @@ class AnalysisServiceImpl(AnalysisService):
                 f"chapter analysis not found: {chapter_id}", code="analysis.chapter_not_found"
             )
         return chapter
+
+    async def split_chapter(
+        self, run_id: UUID, chapter_id: UUID, offset: int
+    ) -> SplitChapterResult:
+        await self.get(run_id)
+        first, second = await self._chapter_service.split(chapter_id, offset)
+        return SplitChapterResult(first=first, second=second)
 
     async def retry_chapter(self, run_id: UUID, chapter_id: UUID) -> ChapterAnalysis:
         chapter = await self.update_chapter(

@@ -80,6 +80,23 @@ class ChaptersService:
                 logging.getLogger(__name__).exception("chapter.save_observer_failed")
         return chapter
 
+    async def split(self, chapter_id: UUID, offset: int) -> tuple[Chapter, Chapter]:
+        chapter = await self.get(chapter_id)
+        if chapter.current_version_id is None:
+            raise ValidationError("chapter has no content", code="chapter.empty")
+        version = await self.get_version(chapter.id, chapter.current_version_id)
+        if offset <= 0 or offset >= len(version.content):
+            raise ValidationError("split offset out of range", code="chapter.split_out_of_range")
+        first = version.content[:offset].rstrip()
+        second = version.content[offset:].lstrip()
+        if not first or not second:
+            raise ValidationError("split would create empty chapter", code="chapter.split_empty")
+        await self.save(chapter_id, chapter.lock_version, first)
+        target = chapter.number + 1
+        await self._repository.shift_numbers(chapter.work_id, target, 1)
+        new_chapter = await self.create(chapter.work_id, target, f"{chapter.title}（续）", second)
+        return await self.get(chapter_id), new_chapter
+
     async def assign_volume(self, chapter_id: UUID, volume_id: UUID | None) -> Chapter:
         chapter = await self.get(chapter_id)
         if volume_id is not None:
