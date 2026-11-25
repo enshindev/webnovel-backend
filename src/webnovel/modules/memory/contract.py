@@ -76,6 +76,18 @@ class ResolvedProposal:
     entity: Entity | None
 
 
+class EntityChangeStatus(StrEnum):
+    CONFIRMED = "confirmed"
+    CORRECTED = "corrected"
+    DISMISSED = "dismissed"
+
+
+class KnowledgeStatus(StrEnum):
+    CONFIRMED = "confirmed"
+    CORRECTED = "corrected"
+    DISMISSED = "dismissed"
+
+
 @dataclass(frozen=True, slots=True)
 class EntityStateChange:
     id: UUID

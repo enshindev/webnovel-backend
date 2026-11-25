@@ -11,11 +11,13 @@ from webnovel.modules.memory.contract import (
     ChangeProposal,
     Contradiction,
     Entity,
+    EntityChangeStatus,
     EntityRelation,
     EntityStateChange,
     ExtractionRun,
     Foreshadow,
     KnowledgeState,
+    KnowledgeStatus,
     MemoryIndexer,
     MemoryService,
     ProposalStatus,
@@ -182,7 +184,7 @@ class MemoryServiceImpl(MemoryService):
     async def update_knowledge_status(
         self, work_id: UUID, knowledge_id: UUID, status: str
     ) -> KnowledgeState:
-        if status not in {"confirmed", "corrected", "dismissed"}:
+        if status not in {item.value for item in KnowledgeStatus}:
             raise ValidationError(
                 f"invalid knowledge status: {status}",
                 code="story_state.invalid_knowledge_status",
@@ -198,7 +200,7 @@ class MemoryServiceImpl(MemoryService):
     async def update_entity_change_status(
         self, work_id: UUID, change_id: UUID, status: str
     ) -> EntityStateChange:
-        if status not in {"confirmed", "corrected", "dismissed"}:
+        if status not in {item.value for item in EntityChangeStatus}:
             raise ValidationError(
                 f"invalid entity change status: {status}",
                 code="story_state.invalid_change_status",
