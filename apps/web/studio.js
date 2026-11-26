@@ -55,7 +55,8 @@ async function createWork(event) {
 async function selectWork(work) {
   state.workId = work.id; state.chapter = null; state.chapterId = null;
   $("current-work").textContent = `${work.title} · ${work.id}`;
-  await Promise.all([loadChapters(), loadStory(), loadAnalysis(), loadLibrary(), loadUsage()]);
+  await Promise.allSettled([loadChapters(), loadStory(), loadAnalysis(), loadLibrary(), loadUsage()]);
+  setStatus("已连接后端");
 }
 
 async function loadChapters() {
@@ -194,6 +195,17 @@ async function loadStory() {
 async function rebuildStory() {
   try { const result = await api(`/works/${state.workId}/story-state/rebuild`, { method: "POST", body: "{}" }); setStatus(`已排队 ${result.queued} 个重建任务`); }
   catch (error) { setStatus(`重建失败：${error.message}`); }
+}
+
+async function loadAnalysis() {
+  if (!state.workId) return;
+  try {
+    const runs = await api(`/works/${state.workId}/analysis/runs`);
+    if (runs[0]) {
+      state.analysisRunId = runs[0].id;
+      $("analysis-run").textContent = `run=${runs[0].id} · ${runs[0].status}`;
+    }
+  } catch (_) { /* analysis is optional */ }
 }
 
 async function startAnalysis() {
