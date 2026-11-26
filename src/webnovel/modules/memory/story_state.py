@@ -55,9 +55,13 @@ def detect_contradictions(events: list[StoryEvent]) -> list[Contradiction]:
                 )
                 previous = entity_history.get((entity, field))
                 if before is not None and previous is not None and str(before) != previous:
+                    kind = {
+                        "location": "entity.teleport",
+                        "relation": "entity.relationship_jump",
+                    }.get(field, "entity.state_sequence")
                     contradictions.append(
                         Contradiction(
-                            kind="entity.state_sequence",
+                            kind=kind,
                             severity="P2",
                             message=(
                                 f"第 {event.chapter_number} 章：{entity} 的 {field} "
