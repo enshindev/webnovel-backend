@@ -5,7 +5,7 @@ import mimetypes
 import os
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 from webnovel.infra.config import Settings
@@ -74,6 +74,11 @@ class LibraryServiceImpl(LibraryService):
         if suffix not in {"txt", "md", "docx", "pdf", "png", "jpg", "jpeg"} | _AUDIO_SUFFIXES:
             raise ValidationError("unsupported file type", code="library.unsupported_type")
         digest = hashlib.sha256(data).hexdigest()
+        finder = getattr(self._repository, "find_document_by_hash", None)
+        if finder is not None:
+            existing = await finder(collection_id, digest)
+            if existing is not None:
+                return cast(LibraryDocument, existing)
         storage_key = f"{uuid4().hex}.{suffix}"
         root = self._settings.library_dir
         root.mkdir(parents=True, exist_ok=True)

@@ -29,6 +29,10 @@ class LibraryRepository(Protocol):
 
     async def get_document(self, document_id: UUID) -> LibraryDocument | None: ...
 
+    async def find_document_by_hash(
+        self, collection_id: UUID, content_hash: str
+    ) -> LibraryDocument | None: ...
+
     async def list_documents(self, collection_id: UUID) -> list[LibraryDocument]: ...
 
     async def delete_document(self, document_id: UUID) -> str | None: ...
@@ -113,6 +117,21 @@ class SqlAlchemyLibraryRepository:
         await self._session.flush()
         await self._session.refresh(model)
         return _document(model)
+
+    async def find_document_by_hash(
+        self, collection_id: UUID, content_hash: str
+    ) -> LibraryDocument | None:
+        model = (
+            await self._session.scalars(
+                select(LibraryDocumentModel)
+                .where(
+                    LibraryDocumentModel.collection_id == collection_id,
+                    LibraryDocumentModel.content_hash == content_hash,
+                )
+                .limit(1)
+            )
+        ).first()
+        return _document(model) if model is not None else None
 
     async def get_document(self, document_id: UUID) -> LibraryDocument | None:
         model = await self._session.get(LibraryDocumentModel, document_id)
