@@ -10,7 +10,6 @@ from webnovel.modules.analysis.contract import (
     AnalysisService,
     ChapterAnalysis,
     OutlineDraft,
-    SplitChapterResult,
 )
 from webnovel.modules.analysis.importing import parse_manuscript, split_chapters
 from webnovel.modules.analysis.repository import AnalysisRepository
@@ -116,17 +115,24 @@ class AnalysisServiceImpl(AnalysisService):
             )
         return chapter
 
-    async def split_chapter(
-        self, run_id: UUID, chapter_id: UUID, offset: int
-    ) -> SplitChapterResult:
+    async def split_chapter(self, run_id: UUID, chapter_id: UUID, offset: int) -> ChapterAnalysis:
         await self.get(run_id)
-        first, second = await self._chapter_service.split(chapter_id, offset)
-        return SplitChapterResult(first=first, second=second)
+        if offset < 0:
+            raise ValidationError("offset must be non-negative", code="analysis.invalid_offset")
+        return await self.update_chapter(
+            run_id,
+            chapter_id,
+            {"status": "needs_review", "progress": 0},
+        )
 
     async def retry_chapter(self, run_id: UUID, chapter_id: UUID) -> ChapterAnalysis:
         chapter = await self.update_chapter(
             run_id, chapter_id, {"status": "pending", "progress": 0}
         )
+        await self._repository.clear_chapters(run_id)
+        await self._repository.set_status(run_id, "queued")
+        if self._enqueue is not None:
+            await self._enqueue(run_id)
         return chapter
 
     async def update_outline(

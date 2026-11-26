@@ -43,6 +43,8 @@ class AnalysisRepository(Protocol):
 
     async def list_chapters(self, run_id: UUID) -> list[ChapterAnalysis]: ...
 
+    async def clear_chapters(self, run_id: UUID) -> None: ...
+
     async def get_chapter(self, run_id: UUID, chapter_id: UUID) -> ChapterAnalysis | None: ...
 
     async def update_chapter(
@@ -136,6 +138,14 @@ class SqlAlchemyAnalysisRepository:
 
     async def add_chapter(self, run_id: UUID, data: dict[str, Any]) -> None:
         self._session.add(ChapterAnalysisModel(run_id=run_id, **data))
+        await self._session.flush()
+
+    async def clear_chapters(self, run_id: UUID) -> None:
+        from sqlalchemy import delete
+
+        await self._session.execute(
+            delete(ChapterAnalysisModel).where(ChapterAnalysisModel.run_id == run_id)
+        )
         await self._session.flush()
 
     async def list_chapters(self, run_id: UUID) -> list[ChapterAnalysis]:

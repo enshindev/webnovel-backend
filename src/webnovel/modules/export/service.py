@@ -4,8 +4,8 @@ from collections.abc import Awaitable, Callable
 from importlib.util import find_spec
 from uuid import UUID
 
-from webnovel.experiments.multimodal.contract import CoverProvider, SpeechProvider
 from webnovel.kernel.errors import ConflictError, NotFoundError, UnavailableError, ValidationError
+from webnovel.kernel.ports.media import CoverProvider, SpeechProvider
 from webnovel.modules.audit.contract import AuditRecorder
 from webnovel.modules.chapters_versions.contract import ChapterService
 from webnovel.modules.export.contract import ExportJob, ExportService

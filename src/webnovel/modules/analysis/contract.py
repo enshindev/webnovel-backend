@@ -5,8 +5,6 @@ from datetime import datetime
 from typing import Any, Protocol
 from uuid import UUID
 
-from webnovel.modules.chapters_versions.contract import Chapter
-
 
 @dataclass(frozen=True, slots=True)
 class OutlineDraft:
@@ -48,12 +46,6 @@ class ChapterAnalysis:
     boundary_confidence: float | None
 
 
-@dataclass(frozen=True, slots=True)
-class SplitChapterResult:
-    first: Chapter
-    second: Chapter
-
-
 class AnalysisService(Protocol):
     async def start_reverse_outline(
         self, work_id: UUID, chapter_range: dict[str, int] | None = None
@@ -83,4 +75,4 @@ class AnalysisService(Protocol):
 
     async def split_chapter(
         self, run_id: UUID, chapter_id: UUID, offset: int
-    ) -> SplitChapterResult: ...
+    ) -> ChapterAnalysis: ...

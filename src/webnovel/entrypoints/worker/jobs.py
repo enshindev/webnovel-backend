@@ -4,11 +4,6 @@ from uuid import UUID
 
 import structlog
 
-from webnovel.experiments.multimodal.factory import (
-    build_cover_provider,
-    build_speech_provider,
-    build_transcription_provider,
-)
 from webnovel.infra.config import get_settings
 from webnovel.infra.db.session import session_factory
 from webnovel.infra.queue import ArqExtractionQueue
@@ -170,6 +165,11 @@ async def run_export(ctx: object, job_id: str) -> None:
             SqlAlchemyUsageRepository(session),
             load_pricing(settings.pricing_config_path),
         )
+        from webnovel.experiments.multimodal.factory import (
+            build_cover_provider,
+            build_speech_provider,
+        )
+
         runner = ExportRunner(
             repository=SqlAlchemyExportRepository(session),
             chapter_service=chapter_service,
@@ -226,6 +226,8 @@ async def run_agent(ctx: object, run_id: str) -> None:
             else None
         )
         memory_repository = SqlAlchemyMemoryRepository(session)
+        from webnovel.experiments.multimodal.factory import build_transcription_provider
+
         tools = AssistantTools(
             retrieval=retrieval,
             memory_repository=memory_repository,

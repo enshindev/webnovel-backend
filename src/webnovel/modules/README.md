@@ -23,8 +23,6 @@
 | `workflow` | S3+ | 多步创作流程编排、阶段与人工卡点 |
 | `export` | S3 | 导出任务与下载 |
 | `usage` | S4 | token / 成本台账 |
-| `graphrag` | S6 | 实体关系子图实验，供查询和助手扩展 |
-| `multimodal` | S6 | ASR / TTS / 封面生成实验，fake/真实 provider 可替换 |
 
 ## 内部结构
 

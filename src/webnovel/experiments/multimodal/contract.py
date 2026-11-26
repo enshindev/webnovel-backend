@@ -1,19 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
 
+from webnovel.kernel.ports.media import CoverProvider, SpeechProvider, TranscriptionProvider
 
-class TranscriptionProvider(Protocol):
-    async def transcribe(self, filename: str, content_type: str, data: bytes) -> str: ...
-
-
-class SpeechProvider(Protocol):
-    async def synthesize(self, text: str, voice: str | None = None) -> bytes: ...
-
-
-class CoverProvider(Protocol):
-    async def generate(self, prompt: str, size: str = "1024x1024") -> bytes: ...
+__all__ = [
+    "CoverProvider",
+    "MultimodalStatus",
+    "SpeechProvider",
+    "TranscriptionProvider",
+]
 
 
 @dataclass(frozen=True, slots=True)

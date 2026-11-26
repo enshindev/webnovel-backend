@@ -36,6 +36,9 @@ class FakeRepository:
             created_at=self.run.created_at,
         )
 
+    async def clear_chapters(self, run_id: UUID) -> None:
+        self.chapters.clear()
+
     async def add_chapter(self, run_id: UUID, data: dict[str, Any]) -> None:
         self.chapters.append(data)
 

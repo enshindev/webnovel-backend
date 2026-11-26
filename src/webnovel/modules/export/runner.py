@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from webnovel.experiments.multimodal.contract import CoverProvider, SpeechProvider
 from webnovel.infra.config import Settings
 from webnovel.kernel.errors import UnavailableError
+from webnovel.kernel.ports.media import CoverProvider, SpeechProvider
 from webnovel.modules.chapters_versions.contract import ChapterService
 from webnovel.modules.export.contract import ExportStatus
 from webnovel.modules.export.render import render_docx, render_txt

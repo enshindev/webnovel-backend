@@ -323,24 +323,57 @@ class SqlAlchemyGenerationRepository:
             return None
         model.status = GenerationStatus.QUEUED.value
         model.accepted_at = None
-        drafts = (
-            await self._session.scalars(
-                select(DraftModel).where(DraftModel.generation_id == generation_id)
-            )
-        ).all()
+        drafts = list(
+            (
+                await self._session.scalars(
+                    select(DraftModel).where(DraftModel.generation_id == generation_id)
+                )
+            ).all()
+        )
         for draft in drafts:
             draft.content = ""
             draft.status = DraftStatus.GENERATING.value
+        next_index = max((draft.candidate_index for draft in drafts), default=-1) + 1
+        new_draft = DraftModel(
+            work_id=model.work_id,
+            chapter_id=model.chapter_id,
+            generation_id=generation_id,
+            content="",
+            status=DraftStatus.GENERATING.value,
+            candidate_index=next_index,
+        )
+        self._session.add(new_draft)
+        await self._session.flush()
+        drafts.append(new_draft)
         candidate_set = (
             await self._session.scalars(
                 select(CandidateSetModel).where(CandidateSetModel.generation_id == generation_id)
             )
         ).first()
         if candidate_set is not None:
+            candidates = list(candidate_set.candidates)
+            candidates.append(
+                {
+                    "candidate_id": str(new_draft.id),
+                    "text_ref": f"draft:{new_draft.id}",
+                    "model": None,
+                    "prompt_version": None,
+                    "features": {"retry": True},
+                }
+            )
+            candidate_set.candidates = candidates
+            candidate_set.shown_order = [*candidate_set.shown_order, next_index]
             self._session.add(
                 PreferenceEventModel(
                     candidate_set_id=candidate_set.id,
-                    candidate_id=str(model.draft_id or model.id),
+                    candidate_id=str(new_draft.id),
+                    event_type="shown",
+                )
+            )
+            self._session.add(
+                PreferenceEventModel(
+                    candidate_set_id=candidate_set.id,
+                    candidate_id=str(new_draft.id),
                     event_type="regenerated",
                     event_metadata={"retry_same_set": True},
                 )
@@ -427,11 +460,13 @@ class SqlAlchemyGenerationRepository:
         if generation is None:
             return
         generation.status = status.value
-        drafts = (
-            await self._session.scalars(
-                select(DraftModel).where(DraftModel.generation_id == generation_id)
-            )
-        ).all()
+        drafts = list(
+            (
+                await self._session.scalars(
+                    select(DraftModel).where(DraftModel.generation_id == generation_id)
+                )
+            ).all()
+        )
         for draft in drafts:
             draft.status = draft_status.value
         await self._session.flush()

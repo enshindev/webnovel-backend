@@ -39,6 +39,7 @@ class AnalysisRunner:
         if run is None or run.status != "queued":
             return
         await self._repository.set_status(run.id, "extracting")
+        await self._repository.clear_chapters(run.id)
         chapters = await self._chapter_service.list(run.work_id)
         chapter_range = run.params.get("chapter_range") or {}
         start = int(chapter_range.get("start", 0) or 0)
@@ -62,7 +63,9 @@ class AnalysisRunner:
                     chapter.id, chapter.current_version_id
                 )
                 extracted = await self._extract(version.content)
-                extracted["boundary_confidence"] = 0.8 if extracted.get("beats") else 0.4
+                extracted["boundary_confidence"] = min(
+                    1.0, len(extracted.get("beats", [])) / max(1, len(selected))
+                )
                 extracted["status"] = "needs_review" if extracted.get("issues") else "ready"
                 extracted["progress"] = 100
                 await self._repository.add_chapter(
